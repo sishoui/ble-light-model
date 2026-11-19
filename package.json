@@ -1,0 +1,14 @@
+{
+  "name": "ble-light-model",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "typecheck": "npm --prefix miniprogram run typecheck",
+    "check:purity": "npm --prefix miniprogram run check:purity",
+    "test:logic": "npm --prefix miniprogram run test",
+    "test:firmware": "pio run -d firmware -e native && pio test -d firmware -e native",
+    "build:native": "pio run -d firmware -e native",
+    "build:esp32c3": "pio run -d firmware -e esp32-c3",
+    "test": "npm run typecheck && npm run check:purity && npm run test:logic && npm run test:firmware"
+  }
+}
