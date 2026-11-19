@@ -1,0 +1,15 @@
+{
+  "name": "@ble-light-model/miniprogram",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "check:purity": "node scripts/check-purity.mjs"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.3",
+    "vitest": "~5.1.1"
+  }
+}
