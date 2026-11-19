@@ -22,6 +22,9 @@ __pycache__/
 .pytest_cache/
 .venv/
 
+# 真机 automator（#18）：每次运行的取证目录（需硬件 + 人工扫码，不进 CI）
+tests/device_automator/runs/
+
 # OS / editor
 .DS_Store
 Thumbs.db

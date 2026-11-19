@@ -188,12 +188,16 @@ export function encodeEffectPayload(params: EffectParams): Uint8Array {
       const color = toRgb(params.color, "color");
       assertByte(params.speed, "speed");
       assertByte(params.length, "length");
+      // canonical 流水参数长度 = 7（golden vectors / 固件 effect_param_lengths）：
+      // R,G,B,speed,length,direction(6) + 末尾 1 保留字节（固件 render_chase 只读
+      // params[0..5]，长度校验要求 1+7；缺保留字节会被 C3 NAK 0x04）。
       return new Uint8Array([
         effectId,
         ...encodeColor(color),
         params.speed,
         params.length,
         encodeDirection(params.direction, "direction"),
+        0x00,
       ]);
     }
     case "twinkle": {

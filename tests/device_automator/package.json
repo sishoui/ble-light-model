@@ -1,0 +1,19 @@
+{
+  "name": "device-automator",
+  "version": "0.0.0",
+  "private": true,
+  "description": "真机 automator：miniprogram-automator + COM6 串口 JSONL，跑真机场景 1-6（不进 CI，不重试）",
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "test:coverage": "node --test --experimental-test-coverage test/*.test.mjs",
+    "dry-run": "node run.js --dry-run"
+  },
+  "dependencies": {
+    "miniprogram-automator": "^0.13.0",
+    "serialport": "^13.0.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
