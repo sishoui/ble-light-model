@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "name": "suspend_resume",
+  "description": "挂起恢复：onHide 保留 ready 连接 -> onShow 校验连接（不重连、无风暴）-> 继续可写",
+  "steps": [
+    { "action": "connect", "deviceId": "C3-A1", "expect": { "state": "ready" } },
+    { "action": "hide", "expect": { "state": "ready" } },
+    { "action": "show", "expect": { "state": "ready", "connectCalls": 1 } },
+    {
+      "action": "write",
+      "hex": "AA550101000201010401FF0000B521",
+      "expect": { "state": "ready", "chunks": [15] }
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "name": "disconnect_reconnect",
+  "description": "断连路径①：C3 掉线（连接状态事件 connected:false）-> reconnecting -> 自动重连 ready",
+  "steps": [
+    { "action": "connect", "deviceId": "C3-A1", "expect": { "state": "ready" } },
+    { "action": "disconnect", "trigger": "remote", "expect": { "state": "reconnecting" } },
+    { "action": "waitForState", "expect": { "state": "ready", "connectCalls": 2 } }
+  ]
+}

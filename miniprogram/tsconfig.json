@@ -15,5 +15,5 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["logic/**/*.ts"]
+  "include": ["logic/**/*.ts", "transport/**/*.ts"]
 }

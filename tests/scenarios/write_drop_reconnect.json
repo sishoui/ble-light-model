@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "name": "write_drop_reconnect",
+  "description": "断连路径②：静默掉线（无连接状态事件）后写 reject 10006 -> NotConnectedError -> 自动重连",
+  "steps": [
+    { "action": "connect", "deviceId": "C3-A1", "expect": { "state": "ready" } },
+    {
+      "action": "write",
+      "hex": "AA550101000201010401FF0000B521",
+      "expect": { "state": "ready", "chunks": [15] }
+    },
+    { "action": "disconnect", "trigger": "silent" },
+    {
+      "action": "write",
+      "hex": "AA550101000201010401FF0000B521",
+      "expect": { "error": "NOT_CONNECTED" }
+    },
+    { "action": "waitForState", "expect": { "state": "ready", "connectCalls": 2 } }
+  ]
+}
