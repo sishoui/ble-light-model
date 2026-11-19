@@ -3,11 +3,11 @@
  *
  * 分发约定（ports 粘合代码的执行顺序，见 gatt.h）：
  * - GATT_ACT_APPLY_EFFECT：ports 调 effect_apply(effects, mask, payload,
- *   len, now_ms)；返回 EFFECT_OK -> 回 ACK（回显 seq），并排 1s 去抖保存；
- *   返回错误码 -> 回 NAK（同错误码，effect_engine 结果码与 NAK 对齐）。
+ *   len, now_ms)；返回 EFFECT_OK -> 状态变更，ports 一律 mark_dirty（1s 去抖
+ *   保存照旧），并按 flags bit0 决定是否回 ACK；返回错误码 -> 回 NAK。
  * - GATT_ACT_SET_BRIGHTNESS / SET_POWER_LIMIT / SET_UNLOCK：ports 更新
- *   共享状态/内部状态，成功回 ACK 并排去抖保存；SET_UNLOCK=1 不排保存
- *   （解锁不持久化）；=0 时夹回默认值并排保存。
+ *   共享状态/内部状态，成功一律 mark_dirty（去抖保存）；ACK 按 flags bit0
+ *   门控；SET_UNLOCK=1 不排保存（解锁不持久化），=0 夹回默认值并排保存。
  * - NAK 由本层产出（门禁失败 / 参数非法），ports 直接发。
  * - GET_STATUS / SET_* 需要 ACK 时，flags bit0 决定回不回 ACK：协议第 2
  *   节"需要 ACK 的命令"是命令语义（SET_EFFECT 等必 ACK）；实现按 flags

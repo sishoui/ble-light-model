@@ -55,7 +55,7 @@ void scene_init_state(scene_state_t *st);
 
 /*
  * 从 led 共享状态快照提取场景状态（start_ms 不进入序列化）。
- * 用于收到 ACK 后的去抖保存：ports 层 snapshot -> scene_capture -> 序列化。
+ * 用于状态变更后的去抖保存：ports 层 snapshot -> scene_capture -> 序列化。
  */
 void scene_capture(const effect_ctx_t *effects, uint8_t brightness,
                    uint16_t power_limit_ma, scene_state_t *out);

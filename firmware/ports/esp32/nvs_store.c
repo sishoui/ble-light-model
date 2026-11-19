@@ -25,7 +25,7 @@ static const char *TAG = "nvs";
 #define NVS_NAMESPACE "ble_light"
 #define NVS_KEY_SCENE "scene"
 
-/* 去抖保存参数（#4：ACK 后 1s 去抖，继续收命令重新计时）。 */
+/* 去抖保存参数（#4：状态变更后 1s 去抖，继续收命令重新计时）。 */
 #define NVS_SAVE_DEBOUNCE_MS 1000u
 
 static nvs_handle_t s_nvs;

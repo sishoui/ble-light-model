@@ -203,9 +203,11 @@ static void on_frame(const ble_proto_frame_t *f)
                              a->payload_len, now);
             if (r == EFFECT_OK) {
                 led_task_set_shared(&shared);
+                /* 状态变更一律 mark_dirty（去抖 1s 保存照旧）；ACK 仍按
+                 * flags bit0 门控 —— 客户端关 ACK 不能顺带关掉持久化。 */
+                nvs_store_mark_dirty();
                 if (gatt_action_wants_ack(f)) {
                     send_ack(f->seq);
-                    nvs_store_mark_dirty();
                 }
             } else {
                 send_nak(f->seq, r);
@@ -216,9 +218,9 @@ static void on_frame(const ble_proto_frame_t *f)
             led_task_snapshot(&shared);
             shared.brightness = a->payload[0];
             led_task_set_shared(&shared);
+            nvs_store_mark_dirty();
             if (gatt_action_wants_ack(f)) {
                 send_ack(f->seq);
-                nvs_store_mark_dirty();
             }
             break;
         case GATT_ACT_SET_POWER_LIMIT: {
@@ -227,9 +229,9 @@ static void on_frame(const ble_proto_frame_t *f)
 
             gatt_disp.power_limit_ma = lim;
             nvs_store_set_power_limit(lim);
+            nvs_store_mark_dirty();
             if (gatt_action_wants_ack(f)) {
                 send_ack(f->seq);
-                nvs_store_mark_dirty();
             }
             break;
         }

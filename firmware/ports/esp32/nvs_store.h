@@ -18,10 +18,12 @@ extern "C" {
  * NVS 命名空间 `ble_light`，键 `scene`；blob 布局 = scene 序列化输出
  * （scene_version(1) + length(2) + payload + CRC(2)，见 core/scene.h）。
  *
- * 去抖保存口径（#4 第 4 节）：收到 ACK 后 1s 去抖 —— 1s 内继续收到
- * 命令则重新计时；到点后把最新场景写进 NVS。实现用「pending 标志 +
- * 截止时间戳」由 100ms 周期定时器推进（NimBLE host 任务里跑，不新开
- * 任务；写 NVS 放在轮次间隙的定时器回调，不碰 RMT 传输窗口）。
+ * 去抖保存口径（#4 第 4 节）：状态变更（SET_EFFECT / SET_BRIGHTNESS /
+ * SET_POWER_LIMIT 等成功落地）后 1s 去抖 —— 1s 内继续收到命令则重新计时；
+ * 到点后把最新场景写进 NVS。ACK 是否回仍由 flags bit0 门控，与保存解耦
+ * （客户端关 ACK 不顺带关持久化）。实现用「pending 标志 + 截止时间戳」由
+ * 100ms 周期定时器推进（NimBLE host 任务里跑，不新开任务；写 NVS 放在
+ * 轮次间隙的定时器回调，不碰 RMT 传输窗口）。
  *
  * power_limit 的来源：led 共享状态目前不含限流字段（#14 之前没人需要）。
  * 为了让保存的 blob 带正确的 power_limit_ma，本模块持有运行时值：
