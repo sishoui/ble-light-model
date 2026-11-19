@@ -230,7 +230,7 @@ def nak_frame(seq: int, err: int) -> bytes:
 
 
 def hello_frame() -> bytes:
-    payload = bytearray(23)
+    payload = bytearray(29)
     payload[0] = 1          # protocol_ver
     payload[1] = 0          # fw_major
     payload[2] = 1          # fw_minor

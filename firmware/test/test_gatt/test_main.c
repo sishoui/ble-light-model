@@ -319,7 +319,7 @@ static void test_dispatch_cap_zero_writes_nothing(void)
 
 static void test_hello_layout(void)
 {
-    uint8_t h[23];
+    uint8_t h[29];
     gatt_build_hello(h, GATT_CAP_FULL_POWER | GATT_CAP_SCENE_SAVE |
                             GATT_CAP_EFFECT_BITMAP,
                      EFFECT_STRIP_COUNT, EFFECT_LEDS_PER_STRIP);
@@ -335,12 +335,13 @@ static void test_hello_layout(void)
     TEST_ASSERT_EQUAL_UINT8(70, h[10]);
     TEST_ASSERT_EQUAL_UINT8(85, h[11]);
     TEST_ASSERT_EQUAL_UINT8(0x07, h[12]);
-    /* effect_bitmap：effect 0–6 置位 -> byte0=0x7F，byte1=0。 */
+    /* effect_bitmap[16]：effect 0–6 置位 -> byte0=0x7F，byte1..15=0。 */
     TEST_ASSERT_EQUAL_UINT8(0x7F, h[13]);
-    TEST_ASSERT_EQUAL_UINT8(0x00, h[14]);
-    for (int i = 15; i < 23; i++) {
+    for (int i = 14; i < 29; i++) {
         TEST_ASSERT_EQUAL_UINT8(0, h[i]);
     }
+    /* 恰好 29 字节（#4 第 2 节，覆盖 effect_id 0–127）。 */
+    TEST_ASSERT_EQUAL_size_t(29, sizeof(h));
 }
 
 /* ---------- 受限恢复夹取（#4 §4：重启后先限 50% / 15000mA） ---------- */

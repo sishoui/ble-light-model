@@ -107,8 +107,8 @@ void gatt_dispatch_init(gatt_dispatch_t *d);
 size_t gatt_dispatch(const gatt_dispatch_t *d, const ble_proto_frame_t *f,
                      gatt_action_t *out_actions, size_t cap);
 
-/* HELLO payload 组帧（23 字节，#4 第 2 节布局）。 */
-void gatt_build_hello(uint8_t out[/* 23 */], uint8_t caps,
+/* HELLO payload 组帧（29 字节，#4 第 2 节布局，effect_bitmap[16]）。 */
+void gatt_build_hello(uint8_t out[/* 29 */], uint8_t caps,
                       uint8_t strip_count, uint8_t leds_per_strip);
 
 /* 某灯带当前 effect_id（active_effect[i]，EFFECT_ID_NONE 表示未设置）。 */

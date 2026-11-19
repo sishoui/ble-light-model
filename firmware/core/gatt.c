@@ -29,17 +29,17 @@ void gatt_dispatch_init(gatt_dispatch_t *d)
 /* ---------- HELLO ---------- */
 
 /*
- * HELLO payload（#4 第 2 节，23 字节）：
+ * HELLO payload（#4 第 2 节，29 字节）：
  *   protocol_ver(1)=1, fw_major(1), fw_minor(1), fw_patch(1),
  *   strip_count(1), leds_per_strip(1), max_current_ma(2),
  *   power_limit_ma(2), thermal_warning_c(1), thermal_shutdown_c(1),
  *   caps(1), effect_bitmap[16]
  * fw 版本 = 0.1.0（v1 阶段，无 OTA 版本协商）。
  */
-void gatt_build_hello(uint8_t out[/* 23 */], uint8_t caps,
+void gatt_build_hello(uint8_t out[/* 29 */], uint8_t caps,
                       uint8_t strip_count, uint8_t leds_per_strip)
 {
-    memset(out, 0, 23);
+    memset(out, 0, 29);
     out[0] = BLE_PROTO_VERSION;
     out[1] = 0u;  /* fw_major */
     out[2] = 1u;  /* fw_minor */
@@ -53,7 +53,8 @@ void gatt_build_hello(uint8_t out[/* 23 */], uint8_t caps,
     out[10] = 70u; /* thermal_warning_c */
     out[11] = 85u; /* thermal_shutdown_c */
     out[12] = caps;
-    /* effect_bitmap[16]：置位 effect_id 0..6（0x00–0x06，全部支持）。 */
+    /* effect_bitmap[16]：置位 effect_id 0..6（0x00–0x06，全部支持）；
+     * 覆盖 effect_id 0–127，其余字节保持 0（memset）。 */
     for (uint8_t i = 0u; i < EFFECT_ID_COUNT; i++) {
         out[13u + (i / 8u)] |= (uint8_t)(1u << (i % 8u));
     }

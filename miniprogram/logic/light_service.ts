@@ -557,10 +557,10 @@ export class LightService {
   }
 }
 
-/** HELLO payload（23 字节）解析（#4 决议第 2 节）；长度不符返回 undefined。 */
+/** HELLO payload 解析（#4 决议第 2 节）；长度不符返回 undefined。 */
 export function parseHello(payload: Uint8Array): HelloInfo | undefined {
-  // 固件 gatt_build_hello 产出 23 字节（effect_bitmap[10]，覆盖 0x00–0x79）；
-  // 协议决议写的是 effect_bitmap[16]（总 29 字节）。两者都接受，按各自长度截 bitmap。
+  // 固件 gatt_build_hello 产出 29 字节（effect_bitmap[16]，覆盖 0x00–0x7F）；
+  // 历史 23 字节（effect_bitmap[10]）仍接受，按各自长度截 bitmap（兼容性）。
   if (payload.length !== 23 && payload.length !== 29) return undefined;
   const view = new DataView(payload.buffer, payload.byteOffset, payload.byteLength);
   const bitmapLen = payload.length - 13;

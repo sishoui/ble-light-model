@@ -43,7 +43,7 @@ export interface FakeLightDeviceOptions {
   unlocked?: boolean;
 }
 
-/** 23 字节 HELLO payload（与固件 gatt_build_hello 对齐，effect_bitmap[10]）。 */
+/** 29 字节 HELLO payload（与固件 gatt_build_hello 对齐，effect_bitmap[16]，#4 第 2 节）。 */
 export function buildHelloPayload(options: FakeLightDeviceOptions = {}): Uint8Array {
   const fw = options.fwVersion ?? [0, 1, 0];
   const stripCount = options.stripCount ?? 8;
@@ -51,7 +51,7 @@ export function buildHelloPayload(options: FakeLightDeviceOptions = {}): Uint8Ar
   const maxCurrentMa = options.maxCurrentMa ?? 30000;
   const powerLimitMa = options.powerLimitMa ?? POWER_LIMIT_MA;
   const bitmap0 = options.effectBitmapByte0 ?? DEFAULT_EFFECT_BITMAP_BYTE0;
-  const payload = new Uint8Array(23);
+  const payload = new Uint8Array(29);
   payload[0] = 1; // protocol_ver
   payload[1] = fw[0];
   payload[2] = fw[1];
@@ -65,7 +65,8 @@ export function buildHelloPayload(options: FakeLightDeviceOptions = {}): Uint8Ar
   payload[10] = 70; // thermal_warning_c
   payload[11] = 85; // thermal_shutdown_c
   payload[12] = 0x07; // caps: bit0 解锁 / bit1 场景 / bit2 bitmap 有效
-  payload[13] = bitmap0; // effect_bitmap[0]
+  payload[13] = bitmap0; // effect_bitmap[0]（覆盖 effect_id 0–7）
+  // effect_bitmap[1..15] 保持 0（覆盖 effect_id 8–127，当前固件只需 byte0）。
   return payload;
 }
 

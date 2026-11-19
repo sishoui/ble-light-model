@@ -144,7 +144,7 @@ static void send_nak(uint16_t seq, uint8_t code)
 
 static void send_hello(void)
 {
-    uint8_t payload[23];
+    uint8_t payload[29];
     uint8_t caps = GATT_CAP_FULL_POWER | GATT_CAP_SCENE_SAVE |
                    GATT_CAP_EFFECT_BITMAP;
 
