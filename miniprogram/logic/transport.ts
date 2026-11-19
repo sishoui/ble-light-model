@@ -90,15 +90,11 @@ export interface Transport {
 
   /** 初始化蓝牙适配器（wx 的 openBluetoothAdapter）。 */
   openAdapter(): Promise<void>;
-  /** 关闭蓝牙适配器（wx 的 closeBluetoothAdapter）。 */
-  closeAdapter(): Promise<void>;
 
   /** 开始扫描（wx 的 startBluetoothDevicesDiscovery）；services 为空表示不过滤。 */
   startDiscovery(services?: string[]): Promise<void>;
   /** 停止扫描（wx 的 stopBluetoothDevicesDiscovery）。 */
   stopDiscovery(): Promise<void>;
-  /** 已扫到的设备（wx 的 getBluetoothDevices）。 */
-  getDevices(): Promise<BleDeviceInfo[]>;
 
   /** 连接设备（wx 的 createBLEConnection）；errCode -1（already connect）视为已连接由上层处理。 */
   connect(deviceId: string): Promise<void>;

@@ -181,19 +181,19 @@ page {
   word-break: break-all;
 }
 
-/* strip_mask 灯路选择 */
+/* strip_mask 灯带选择 */
 .mask {
   font-size: 24rpx;
   color: #4a90d9;
 }
 
-.lanes {
+.strips {
   display: flex;
   gap: 10rpx;
   margin: 12rpx 0;
 }
 
-.lane {
+.strip {
   width: 64rpx;
   height: 64rpx;
   line-height: 64rpx;
@@ -204,12 +204,12 @@ page {
   color: #8a94b0;
 }
 
-.lane--on {
+.strip--on {
   background: #4a90d9;
   color: #fff;
 }
 
-.lane-actions {
+.strip-actions {
   justify-content: flex-start;
   gap: 16rpx;
 }

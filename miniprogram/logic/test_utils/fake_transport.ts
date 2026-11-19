@@ -277,6 +277,12 @@ export class FakeTransport implements Transport {
     await this.guard("stopDiscovery", "", () => undefined);
   }
 
+  /**
+   * 已扫到的设备（微信 getBluetoothDevices 的归一形状）。
+   * 注意：已从 Transport 接口移除（BleLink 用 onDeviceFound 事件跟踪设备，
+   * 不调用本方法）；保留为 FakeTransport 的具体方法，供 ui_spike 的微信层
+   * mock（getBluetoothDevices）复用同一设备模型。
+   */
   async getDevices(): Promise<BleDeviceInfo[]> {
     return this.guard("getDevices", "", () => this.devices.slice());
   }

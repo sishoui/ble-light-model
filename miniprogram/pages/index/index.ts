@@ -8,8 +8,18 @@
  */
 
 import { BleLink } from "../../logic/ble_link";
-import { LightBusinessService, NeedsUnlockError, isNotUnlocked } from "../../logic/business_service";
-import { EFFECT_IDS, LightService } from "../../logic/light_service";
+import {
+  LightBusinessService,
+  NeedsUnlockError,
+  isNotUnlocked,
+  stripMaskFromStrips,
+} from "../../logic/business_service";
+import {
+  POWER_LIMIT_MA,
+  STRIP_COUNT,
+  STRIP_MASK_ALL,
+} from "../../logic/constants";
+import { EFFECT_IDS, EFFECT_ID_NONE, LightService } from "../../logic/light_service";
 import type { EffectParams, HelloInfo, LightStatus, Rgb } from "../../logic/light_service";
 import type { LinkState } from "../../logic/ble_link";
 import { WxTransport } from "../../transport/wx_transport";
@@ -101,10 +111,10 @@ interface PageData {
   effectParamLabel: string;
   effectParam: number;
 
-  lanes: boolean[];
+  strips: boolean[];
   mask: number;
   maskText: string;
-  allLanesSelected: boolean;
+  allStripsSelected: boolean;
 
   colorR: number;
   colorG: number;
@@ -130,8 +140,8 @@ interface PageCustom {
   onSelectDevice(event: WechatMiniprogram.TouchEvent): void;
   onDisconnect(): void;
   onSelectEffect(event: WechatMiniprogram.TouchEvent): void;
-  onToggleLane(event: WechatMiniprogram.TouchEvent): void;
-  onSelectAllLanes(event: WechatMiniprogram.TouchEvent): void;
+  onToggleStrip(event: WechatMiniprogram.TouchEvent): void;
+  onSelectAllStrips(event: WechatMiniprogram.TouchEvent): void;
   onColorR(event: SliderEvent): void;
   onColorG(event: SliderEvent): void;
   onColorB(event: SliderEvent): void;
@@ -147,7 +157,6 @@ interface PageCustom {
   onApplyPowerLimit(): void;
   onRefreshStatus(): void;
   buildParams(effect: EffectRow): EffectParams;
-  lanesToMask(): number;
   refreshMask(): void;
   formatStatus(status: LightStatus): StatusRow;
   pushLog(message: string): void;
@@ -174,10 +183,10 @@ Page<PageData, PageCustom>({
     effectParamLabel: "",
     effectParam: 2000,
 
-    lanes: [false, false, false, false, false, false, false, false],
+    strips: new Array<boolean>(STRIP_COUNT).fill(false),
     mask: 0,
     maskText: "未选择",
-    allLanesSelected: false,
+    allStripsSelected: false,
 
     colorR: 255,
     colorG: 0,
@@ -187,7 +196,7 @@ Page<PageData, PageCustom>({
     color2B: 255,
 
     brightness: 128,
-    powerLimit: 15000,
+    powerLimit: POWER_LIMIT_MA,
     fullPowerUnlocked: false,
     applying: false,
 
@@ -315,18 +324,18 @@ Page<PageData, PageCustom>({
     });
   },
 
-  onToggleLane(event: WechatMiniprogram.TouchEvent) {
+  onToggleStrip(event: WechatMiniprogram.TouchEvent) {
     const index = Number(event.currentTarget.dataset["index"] ?? -1);
-    if (index < 0 || index > 7) return;
-    const lanes = this.data.lanes.slice();
-    lanes[index] = !lanes[index];
-    this.setData({ lanes });
+    if (index < 0 || index >= STRIP_COUNT) return;
+    const strips = this.data.strips.slice();
+    strips[index] = !strips[index];
+    this.setData({ strips });
     this.refreshMask();
   },
 
-  onSelectAllLanes(event: WechatMiniprogram.TouchEvent) {
+  onSelectAllStrips(event: WechatMiniprogram.TouchEvent) {
     const all = event.currentTarget.dataset["all"] === true || event.currentTarget.dataset["all"] === "true";
-    this.setData({ lanes: new Array<boolean>(8).fill(all) });
+    this.setData({ strips: new Array<boolean>(STRIP_COUNT).fill(all) });
     this.refreshMask();
   },
 
@@ -463,24 +472,18 @@ Page<PageData, PageCustom>({
     }
   },
 
-  lanesToMask(): number {
-    let mask = 0;
-    for (let i = 0; i < this.data.lanes.length; i += 1) if (this.data.lanes[i]) mask |= 1 << i;
-    return mask;
-  },
-
   refreshMask() {
-    const mask = this.lanesToMask();
+    const mask = stripMaskFromStrips(this.data.strips);
     const count = mask === 0 ? 0 : popcount(mask);
     const maskText =
-      mask === 0xff ? "全路（0xFF）" : count === 0 ? "未选择" : `${count} 路（0x${mask.toString(16).padStart(2, "0")}）`;
-    this.setData({ mask, maskText, allLanesSelected: mask === 0xff });
+      mask === STRIP_MASK_ALL ? "全路（0xFF）" : count === 0 ? "未选择" : `${count} 路（0x${mask.toString(16).padStart(2, "0")}）`;
+    this.setData({ mask, maskText, allStripsSelected: mask === STRIP_MASK_ALL });
   },
 
   formatStatus(status: LightStatus): StatusRow {
     const thermal = status.thermalStatus === 0 ? "正常" : status.thermalStatus === 1 ? "警告" : "关闭输出";
     const active = status.activeEffect
-      .map((id, i) => (id === 0xff ? `L${i}:—` : `L${i}:${effectName(id)}`))
+      .map((id, i) => (id === EFFECT_ID_NONE ? `L${i}:—` : `L${i}:${effectName(id)}`))
       .join("  ");
     return {
       uptime: `${status.uptimeS}s`,

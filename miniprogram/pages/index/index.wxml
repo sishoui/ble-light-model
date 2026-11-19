@@ -65,20 +65,20 @@
         <text class="section-title">灯带选择（strip_mask）</text>
         <text class="mask">{{maskText}}</text>
       </view>
-      <view class="lanes">
+      <view class="strips">
         <view
-          wx:for="{{lanes}}"
+          wx:for="{{strips}}"
           wx:key="*this"
-          class="lane {{item ? 'lane--on' : ''}}"
+          class="strip {{item ? 'strip--on' : ''}}"
           data-index="{{index}}"
-          bindtap="onToggleLane"
+          bindtap="onToggleStrip"
         >
           L{{index}}
         </view>
       </view>
-      <view class="row lane-actions">
-        <button class="btn btn--tiny" data-all="true" bindtap="onSelectAllLanes">全选</button>
-        <button class="btn btn--tiny btn--ghost" data-all="false" bindtap="onSelectAllLanes">清空</button>
+      <view class="row strip-actions">
+        <button class="btn btn--tiny" data-all="true" bindtap="onSelectAllStrips">全选</button>
+        <button class="btn btn--tiny btn--ghost" data-all="false" bindtap="onSelectAllStrips">清空</button>
       </view>
     </view>
 

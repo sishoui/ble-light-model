@@ -15,13 +15,13 @@
 
 import { encode, feed, FRAME_TYPES, effectParamLength, NAK } from "../codec";
 import type { Frame } from "../codec";
+import {
+  BRIGHTNESS_LIMIT,
+  POWER_LIMIT_MA,
+  POWER_LIMIT_MAX_MA,
+} from "../constants";
 import { FakeTransport, bytesToHex } from "./fake_transport";
 import type { BleDeviceInfo } from "../transport";
-
-/** 受限态阈值（与固件 gatt.h 对齐）。 */
-export const BRIGHTNESS_LIMIT = 127;
-export const POWER_LIMIT_MA = 15000;
-export const POWER_LIMIT_MAX_MA = 30000;
 
 /** 固件默认 HELLO 的 effect_bitmap 首字节：0x00–0x06 受支持（C3 bitmap=0x7F）。 */
 const DEFAULT_EFFECT_BITMAP_BYTE0 = 0x7f;

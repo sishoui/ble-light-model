@@ -12,15 +12,17 @@ import { BleLink } from "./ble_link";
 import { FRAME_TYPES } from "./codec";
 import { InvalidStateError, TimeoutError } from "./errors";
 import {
-  BRIGHTNESS_LIMIT,
   LightBusinessService,
   NeedsUnlockError,
+  isNotUnlocked,
+  stripsFromStripMask,
+  stripMaskFromStrips,
+} from "./business_service";
+import {
+  BRIGHTNESS_LIMIT,
   POWER_LIMIT_MA,
   STRIP_MASK_ALL,
-  isNotUnlocked,
-  lanesFromStripMask,
-  stripMaskFromLanes,
-} from "./business_service";
+} from "./constants";
 import { FakeTransport } from "./test_utils/fake_transport";
 import { FakeLightDevice } from "./test_utils/fake_device";
 import type { FakeLightDeviceOptions } from "./test_utils/fake_device";
@@ -214,16 +216,16 @@ describe("FakeLightDevice.reboot 受限夹取（#4 §4）", () => {
 });
 
 describe("LightBusinessService strip_mask 单路 / 多路", () => {
-  it("lanes <-> mask 互转（含全选 / 单路 / 多路）", () => {
-    expect(stripMaskFromLanes([true, false, false, false, false, false, false, false])).toBe(0x01);
-    expect(stripMaskFromLanes([true, false, true, false, false, false, false, false])).toBe(0x05);
-    expect(stripMaskFromLanes(new Array<boolean>(8).fill(true))).toBe(STRIP_MASK_ALL);
-    expect(lanesFromStripMask(0x05)).toEqual([true, false, true, false, false, false, false, false]);
-    expect(lanesFromStripMask(0x00)).toEqual(new Array<boolean>(8).fill(false));
+  it("strips <-> mask 互转（含全选 / 单路 / 多路）", () => {
+    expect(stripMaskFromStrips([true, false, false, false, false, false, false, false])).toBe(0x01);
+    expect(stripMaskFromStrips([true, false, true, false, false, false, false, false])).toBe(0x05);
+    expect(stripMaskFromStrips(new Array<boolean>(8).fill(true))).toBe(STRIP_MASK_ALL);
+    expect(stripsFromStripMask(0x05)).toEqual([true, false, true, false, false, false, false, false]);
+    expect(stripsFromStripMask(0x00)).toEqual(new Array<boolean>(8).fill(false));
   });
 
-  it("lanes 长度不对 → InvalidStateError", () => {
-    expect(() => stripMaskFromLanes([true, false])).toThrow(InvalidStateError);
+  it("strips 长度不对 → InvalidStateError", () => {
+    expect(() => stripMaskFromStrips([true, false])).toThrow(InvalidStateError);
   });
 
   it("单路 setEffect 只更新选路灯（STATUS active_effect 校验）", async () => {
@@ -239,7 +241,7 @@ describe("LightBusinessService strip_mask 单路 / 多路", () => {
     const { service, device } = setup();
     await connect(service);
     // 选 L0/L2/L4：mask=0x15，渐变。
-    const mask = stripMaskFromLanes([true, false, true, false, true, false, false, false]);
+    const mask = stripMaskFromStrips([true, false, true, false, true, false, false, false]);
     expect(mask).toBe(0x15);
     await service.setEffect(mask, {
       effect: "gradient",

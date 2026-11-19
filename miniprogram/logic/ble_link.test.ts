@@ -521,3 +521,17 @@ describe("错误映射兜底", () => {
     expect(link.state).toBe("fault");
   });
 });
+
+describe("FakeTransport.setDelay（延迟回调）", () => {
+  it("setDelay 让 write 回调延迟指定毫秒（写路径确实等待延迟）", async () => {
+    const { link, transport } = setup();
+    await link.connect(DEFAULT_DEVICE_ID);
+    transport.setDelay("write", 40);
+    const t0 = Date.now();
+    await link.write(new Uint8Array([0xaa, 0x55]));
+    const elapsed = Date.now() - t0;
+    // 延迟生效：write 至少等了 ~40ms（留 CI 抖动余量，阈值 30）。
+    expect(elapsed).toBeGreaterThanOrEqual(30);
+    expect(transport.opCount("write")).toBe(1);
+  });
+});

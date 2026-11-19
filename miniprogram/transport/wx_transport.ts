@@ -65,10 +65,6 @@ export class WxTransport implements Transport {
     await this.wxApi.openBluetoothAdapter();
   }
 
-  async closeAdapter(): Promise<void> {
-    await this.wxApi.closeBluetoothAdapter();
-  }
-
   async startDiscovery(services?: string[]): Promise<void> {
     const options: { allowDuplicatesKey?: boolean; services?: string[] } = { allowDuplicatesKey: true };
     if (services !== undefined) options.services = services;
@@ -77,11 +73,6 @@ export class WxTransport implements Transport {
 
   async stopDiscovery(): Promise<void> {
     await this.wxApi.stopBluetoothDevicesDiscovery();
-  }
-
-  async getDevices(): Promise<BleDeviceInfo[]> {
-    const { devices } = await this.wxApi.getBluetoothDevices();
-    return devices.map((device) => ({ ...device }));
   }
 
   async connect(deviceId: string): Promise<void> {

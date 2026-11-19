@@ -239,7 +239,7 @@ interface PendingWrite {
 export class LightService {
   private readonly link: BleLink;
   private readonly ackTimeoutMs: number;
-  private nextSeq = 0;
+  private seqCounter = 0;
   private remainder: Uint8Array = new Uint8Array(0);
   /** 按 seq 索引的待决写（并发 setEffect 各自等自己的 ACK；写本身由 BleLink 串行）。 */
   private readonly pending = new Map<number, PendingWrite>();
@@ -342,8 +342,7 @@ export class LightService {
   async setEffect(stripMask: number, params: EffectParams): Promise<void> {
     assertByte(stripMask, "stripMask");
     const payload = encodeEffectPayload(params);
-    const seq = this.nextSeq;
-    this.nextSeq = (this.nextSeq + 1) & 0xffff;
+    const seq = this.nextSeq();
     const frame = encode({
       version: PROTOCOL_VERSION,
       seq,
@@ -364,8 +363,7 @@ export class LightService {
     if (this.link.state !== "ready") {
       throw new InvalidStateError(`当前状态 ${this.link.state} 不可查询状态`);
     }
-    const seq = this.nextSeq;
-    this.nextSeq = (this.nextSeq + 1) & 0xffff;
+    const seq = this.nextSeq();
     const frame = encode({
       version: PROTOCOL_VERSION,
       seq,
@@ -425,8 +423,7 @@ export class LightService {
 
   /** 全局命令（SET_BRIGHTNESS / SET_POWER_LIMIT / UNLOCK）统一编码：strip_mask 固定 0xFF、flags bit0=1。 */
   private async sendGlobalCommand(type: number, payload: Uint8Array): Promise<void> {
-    const seq = this.nextSeq;
-    this.nextSeq = (this.nextSeq + 1) & 0xffff;
+    const seq = this.nextSeq();
     const frame = encode({
       version: PROTOCOL_VERSION,
       seq,
@@ -439,6 +436,13 @@ export class LightService {
   }
 
   private statusWaiter: { resolve: (status: LightStatus) => void; reject: (error: unknown) => void; timer: ReturnType<typeof setTimeout> | undefined } | undefined;
+
+  /** 分配下一个发送序号（16 位循环，#4；三处 seq&0xffff 收拢于此）。 */
+  private nextSeq(): number {
+    const seq = this.seqCounter;
+    this.seqCounter = (this.seqCounter + 1) & 0xffff;
+    return seq;
+  }
 
   private async writeAndWaitAck(frame: Uint8Array, seq: number): Promise<void> {
     // #4 §4：发送端超时 500ms 重传整帧（走正常写路径），最多 3 次尝试；

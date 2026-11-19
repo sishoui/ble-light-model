@@ -25,6 +25,7 @@ import { isBleTransportFailure } from "./transport";
 import type {
   BleCharacteristicInfo,
   BleDeviceInfo,
+  BleNotification,
   BleServiceInfo,
   Platform,
   Transport,
@@ -126,9 +127,7 @@ export class BleLink {
   private reconnectTimer: ReturnType<typeof setTimeout> | undefined;
 
   private readonly stateListeners = new Set<(state: LinkState) => void>();
-  private readonly notificationListeners = new Set<
-    (notification: { deviceId: string; serviceId: string; characteristicId: string; value: ArrayBuffer }) => void
-  >();
+  private readonly notificationListeners = new Set<(notification: BleNotification) => void>();
 
   constructor(transport: Transport, options: BleLinkOptions = {}) {
     this.transport = transport;
@@ -195,14 +194,7 @@ export class BleLink {
     this.stateListeners.add(listener);
   }
 
-  onNotification(
-    listener: (notification: {
-      deviceId: string;
-      serviceId: string;
-      characteristicId: string;
-      value: ArrayBuffer;
-    }) => void,
-  ): void {
+  onNotification(listener: (notification: BleNotification) => void): void {
     this.notificationListeners.add(listener);
   }
 

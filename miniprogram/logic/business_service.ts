@@ -15,20 +15,19 @@
 
 import type { LinkState } from "./ble_link";
 import { NAK } from "./codec";
+import {
+  BRIGHTNESS_LIMIT,
+  POWER_LIMIT_MA,
+  POWER_LIMIT_MAX_MA,
+  STRIP_COUNT,
+  STRIP_MASK_ALL,
+} from "./constants";
 import { BleDomainError, InvalidStateError } from "./errors";
 import { LightService, supportsEffect } from "./light_service";
 import type { EffectParams, HelloInfo, LightStatus } from "./light_service";
 
-/** 受限态亮度上限（> 此值需满功率解锁，与固件 GATT_BRIGHTNESS_LIMIT 对齐）。 */
-export const BRIGHTNESS_LIMIT = 127;
-/** 受限态限流上限（mA，> 此值需满功率解锁）。 */
-export const POWER_LIMIT_MA = 15000;
-/** 硬件限流上限（mA，超过恒 NAK 0x05 非法参数）。 */
-export const POWER_LIMIT_MAX_MA = 30000;
 /** 灯路数（strip_mask 8 位）。 */
-export const STRIP_COUNT = 8;
-/** 全路掩码。 */
-export const STRIP_MASK_ALL = 0xff;
+export { STRIP_COUNT, STRIP_MASK_ALL };
 
 /**
  * 受限态超限（C3 NAK 0x06 未解锁）：页面据此弹"需满功率解锁"。
@@ -43,20 +42,20 @@ export class NeedsUnlockError extends BleDomainError {
 }
 
 /** 8 路布尔选择 -> strip_mask 字节（第 i 位对应 L{i}）。 */
-export function stripMaskFromLanes(lanes: readonly boolean[]): number {
-  if (lanes.length !== STRIP_COUNT) {
-    throw new InvalidStateError(`灯路选择必须 ${STRIP_COUNT} 路，收到 ${lanes.length}`);
+export function stripMaskFromStrips(strips: readonly boolean[]): number {
+  if (strips.length !== STRIP_COUNT) {
+    throw new InvalidStateError(`灯带选择必须 ${STRIP_COUNT} 路，收到 ${strips.length}`);
   }
   let mask = 0;
-  for (let i = 0; i < STRIP_COUNT; i += 1) if (lanes[i]) mask |= 1 << i;
+  for (let i = 0; i < STRIP_COUNT; i += 1) if (strips[i]) mask |= 1 << i;
   return mask;
 }
 
 /** strip_mask 字节 -> 8 路布尔选择（第 i 位对应 L{i}）。 */
-export function lanesFromStripMask(mask: number): boolean[] {
-  const lanes: boolean[] = [];
-  for (let i = 0; i < STRIP_COUNT; i += 1) lanes.push((mask & (1 << i)) !== 0);
-  return lanes;
+export function stripsFromStripMask(mask: number): boolean[] {
+  const strips: boolean[] = [];
+  for (let i = 0; i < STRIP_COUNT; i += 1) strips.push((mask & (1 << i)) !== 0);
+  return strips;
 }
 
 /** 判断错误是否为"未解锁"（NAK 0x06）：ServiceNakError 或已归一的 NeedsUnlockError。 */
