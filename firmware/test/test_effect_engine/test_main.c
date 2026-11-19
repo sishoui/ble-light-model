@@ -203,12 +203,12 @@ static void test_effect_rainbow_reverse_mirrors_direction(void)
 
 /* ---------- 0x05 流水 ---------- */
 
-static void test_effect_chase_moves_head_along_strip(void)
+static void test_effect_flow_moves_head_along_strip(void)
 {
     effect_ctx_t ctx;
     uint8_t out[LEDS * 3];
     /* R=255，speed=1（每 16ms 一步），length=3，direction=0，末尾 1 保留。 */
-    static const uint8_t p[] = {EFFECT_ID_CHASE, 255, 0, 0, 1, 3, 0, 0};
+    static const uint8_t p[] = {EFFECT_ID_FLOW, 255, 0, 0, 1, 3, 0, 0};
 
     effect_init(&ctx);
     TEST_ASSERT_EQUAL_UINT8(EFFECT_OK, effect_apply(&ctx, 0x01, p, sizeof(p), 100));
@@ -228,7 +228,7 @@ static void test_effect_chase_moves_head_along_strip(void)
     TEST_ASSERT_EQUAL_UINT8(0, out[4 * 3 + 0]);
 
     /* 反向：头从尾部向头部走。 */
-    static const uint8_t pr[] = {EFFECT_ID_CHASE, 255, 0, 0, 1, 3, 1, 0};
+    static const uint8_t pr[] = {EFFECT_ID_FLOW, 255, 0, 0, 1, 3, 1, 0};
     TEST_ASSERT_EQUAL_UINT8(EFFECT_OK, effect_apply(&ctx, 0x01, pr, sizeof(pr), 200));
     render(&ctx, 0, 200, out);
     TEST_ASSERT_EQUAL_UINT8(255, out[(LEDS - 1) * 3 + 0]);
@@ -493,7 +493,7 @@ int main(void)
     RUN_TEST(test_effect_gradient_reverse_direction);
     RUN_TEST(test_effect_rainbow_hue_wheel_and_speed);
     RUN_TEST(test_effect_rainbow_reverse_mirrors_direction);
-    RUN_TEST(test_effect_chase_moves_head_along_strip);
+    RUN_TEST(test_effect_flow_moves_head_along_strip);
     RUN_TEST(test_effect_twinkle_sparse_lights_change_with_frames);
     RUN_TEST(test_effect_twinkle_density_max_lights_all);
     RUN_TEST(test_effect_twinkle_density_zero_is_dark);

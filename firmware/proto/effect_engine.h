@@ -39,7 +39,7 @@ extern "C" {
 #define EFFECT_ID_BREATH 0x02u
 #define EFFECT_ID_GRADIENT 0x03u
 #define EFFECT_ID_RAINBOW 0x04u
-#define EFFECT_ID_CHASE 0x05u
+#define EFFECT_ID_FLOW 0x05u
 #define EFFECT_ID_TWINKLE 0x06u
 #define EFFECT_ID_COUNT 7u
 

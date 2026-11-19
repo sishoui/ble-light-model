@@ -15,25 +15,7 @@
 
 #include <string.h>
 
-/* CRC-16/CCITT-FALSE（proto/crc16 同源实现，core 不依赖 proto）。 */
-static uint16_t scene_crc16(const uint8_t *data, size_t len)
-{
-    uint16_t crc = 0xFFFFu;
-    size_t i;
-    int bit;
-
-    for (i = 0u; i < len; i++) {
-        crc ^= (uint16_t)((uint16_t)data[i] << 8);
-        for (bit = 0; bit < 8; bit++) {
-            if ((crc & 0x8000u) != 0u) {
-                crc = (uint16_t)((uint16_t)(crc << 1) ^ 0x1021u);
-            } else {
-                crc = (uint16_t)(crc << 1);
-            }
-        }
-    }
-    return crc;
-}
+#include "crc16.h"
 
 void scene_init_state(scene_state_t *st)
 {
@@ -87,7 +69,7 @@ size_t scene_encode(const scene_state_t *st, uint8_t *out, size_t out_cap)
     out[len_off + 1u] = (uint8_t)((plen >> 8) & 0xFFu);
 
     /* CRC 覆盖 version..payload 末尾（与协议帧同口径：头到数据）。 */
-    crc = scene_crc16(out, off);
+    crc = crc16_ccitt_false(out, off);
     if (off + 2u > out_cap) {
         return 0u;
     }
@@ -124,7 +106,7 @@ int scene_decode(const uint8_t *blob, size_t len, scene_state_t *out)
     if (plen != (uint16_t)(len - (SCENE_BLOB_OVERHEAD + 2u))) {
         return 0;
     }
-    crc_calc = scene_crc16(blob, len - 2u);
+    crc_calc = crc16_ccitt_false(blob, len - 2u);
     crc_recv = (uint16_t)((uint16_t)blob[len - 2u] |
                           ((uint16_t)blob[len - 1u] << 8));
     if (crc_calc != crc_recv) {

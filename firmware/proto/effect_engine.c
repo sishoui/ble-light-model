@@ -55,7 +55,7 @@ static uint8_t validate_params(uint8_t effect_id, const uint8_t *params)
         }
         return EFFECT_OK;
     case EFFECT_ID_RAINBOW:
-    case EFFECT_ID_CHASE:
+    case EFFECT_ID_FLOW:
     case EFFECT_ID_TWINKLE:
         return EFFECT_OK;
     default:
@@ -234,7 +234,7 @@ static void render_rainbow(const effect_strip_t *st, uint32_t now_ms, uint8_t *o
     }
 }
 
-static void render_chase(const effect_strip_t *st, uint32_t now_ms, uint8_t *out)
+static void render_flow(const effect_strip_t *st, uint32_t now_ms, uint8_t *out)
 {
     /* params: R,G,B, speed, length, direction */
     uint8_t speed = st->params[3];
@@ -317,8 +317,8 @@ void effect_render(const effect_ctx_t *ctx, uint8_t strip,
     case EFFECT_ID_RAINBOW:
         render_rainbow(st, now_ms, out);
         break;
-    case EFFECT_ID_CHASE:
-        render_chase(st, now_ms, out);
+    case EFFECT_ID_FLOW:
+        render_flow(st, now_ms, out);
         break;
     case EFFECT_ID_TWINKLE:
         render_twinkle(st, strip, now_ms, out);
