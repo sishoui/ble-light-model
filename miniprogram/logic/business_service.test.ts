@@ -310,7 +310,7 @@ describe("LightBusinessService 生命周期与错误透传", () => {
     await expect(service.setEffect(0xff, { effect: "off" })).rejects.toBeInstanceOf(InvalidStateError);
   });
 
-  it("无 ACK 时 setBrightness 抛 TimeoutError（500ms，不重试）", async () => {
+  it("无 ACK 时 setBrightness 重传整帧最多 3 次后抛 TimeoutError", async () => {
     // 用一个不回 ACK 的"哑"设备模型：onWrite 不做事。
     const transport = new FakeTransport({ mtu: 247 });
     const link = new BleLink(transport, {
@@ -323,8 +323,8 @@ describe("LightBusinessService 生命周期与错误透传", () => {
     await service.scan({ timeoutMs: 10 });
     await service.connect();
     await expect(service.setBrightness(100)).rejects.toBeInstanceOf(TimeoutError);
-    // 只发一次（write 一次），不自动重试。
-    expect(transport.opCount("write")).toBe(1);
+    // 首发 + 重传共 3 次（#4 §4 发送端超时重传口径）。
+    expect(transport.opCount("write")).toBe(3);
   });
 });
 

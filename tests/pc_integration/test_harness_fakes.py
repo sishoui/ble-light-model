@@ -357,6 +357,89 @@ def test_nak_step_ok(tmp_path):
     assert ok, [o.detail for o in outcomes]
 
 
+# ---- ACK 超时重传（#4 §4：500ms / 最多 3 次 / NAK 立即停） ----------------------
+
+
+def _count_writes(client, type_, mask=None):
+    n = 0
+    for w in client.writes:
+        frames, _errors, _rem = pc_protocol.feed(w)
+        if not frames:
+            continue
+        f = frames[0]
+        if f["type"] != type_:
+            continue
+        if mask is not None and f["strip_mask"] != mask:
+            continue
+        n += 1
+    return n
+
+
+def test_ack_retransmit_then_success(tmp_path):
+    # 首次写（场景步骤 mask=0x01）不回 ACK notify，重传后回 ACK：验证帧级重传。
+    bench, serial_log, ble_link, config = make_kit(
+        tmp_path, config_kwargs={"ack_timeout_s": 0.05}
+    )
+    base = make_device_responder(bench)
+    dropped = {"n": 0}
+
+    def responder(data: bytes) -> None:
+        frames, _errors, _rem = pc_protocol.feed(data)
+        is_scenario = any(
+            f["type"] == FT["setEffect"] and f["strip_mask"] == 0x01 for f in frames
+        )
+        if is_scenario and dropped["n"] == 0:
+            dropped["n"] += 1
+            # 首次：只发 rx 串口行，不回 ACK notify（模拟空口丢 ACK）。
+            for f in frames:
+                bench.push_serial({
+                    "t_ms": int(bench.clock() * 1000), "seq": f["seq"],
+                    "ev": "rx", "type": f["type"], "flags": f["flags"],
+                    "len": len(f["payload"]),
+                })
+            return
+        base(data)
+
+    bench.responder = responder
+
+    ok, outcomes, run_dir, err = asyncio.run(
+        run_scenario(config, [set_effect_step()], clock=bench.clock,
+                     serial_log=serial_log, ble_link=ble_link)
+    )
+    assert ok, [o.detail for o in outcomes]
+    assert dropped["n"] == 1  # 恰好丢了一次 ACK
+    # 场景步骤帧写了 2 次（首发 + 1 次重传）。
+    assert _count_writes(bench.current_client, FT["setEffect"], 0x01) == 2
+
+
+def test_nak_stops_retransmit(tmp_path):
+    # 场景步骤回 NAK：收到 NAK 立即停止，不重传（只写 1 次）。
+    bench, serial_log, ble_link, config = make_kit(
+        tmp_path, config_kwargs={"ack_timeout_s": 0.05}
+    )
+    base = make_device_responder(bench)
+
+    def responder(data: bytes) -> None:
+        frames, _errors, _rem = pc_protocol.feed(data)
+        if any(f["type"] == FT["setEffect"] and f["strip_mask"] == 0x01 for f in frames):
+            for f in frames:
+                bench.emit_notify(nak_frame(f["seq"], 6))
+                bench.push_serial({"t_ms": int(bench.clock() * 1000),
+                                   "seq": f["seq"], "ev": "nak", "err": 6})
+            return
+        base(data)
+
+    bench.responder = responder
+
+    ok, outcomes, run_dir, err = asyncio.run(
+        run_scenario(config, [set_effect_step()], clock=bench.clock,
+                     serial_log=serial_log, ble_link=ble_link)
+    )
+    assert not ok  # 期望 ACK 却收到 NAK -> 步骤失败
+    # 只写 1 次：NAK 后立即停止，不重传。
+    assert _count_writes(bench.current_client, FT["setEffect"], 0x01) == 1
+
+
 # ---- 断连重连 ----------------------------------------------------------------
 
 

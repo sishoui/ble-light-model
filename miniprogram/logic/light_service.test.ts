@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import { BleLink } from "./ble_link";
 import { encode, FRAME_TYPES, PROTOCOL_VERSION } from "./codec";
 import { InvalidStateError, TimeoutError } from "./errors";
-import { EffectParamError, LightService, encodeEffectPayload } from "./light_service";
+import { EffectParamError, LightService, encodeEffectPayload, ACK_MAX_ATTEMPTS } from "./light_service";
 import type { EffectParams } from "./light_service";
 import { FakeTransport, bytesToHex, hexToBytes } from "./test_utils/fake_transport";
 import { FakeLightDevice } from "./test_utils/fake_device";
@@ -48,8 +48,14 @@ function ackHexFor(seq: number): string {
   return bytesToHex(encode({ version: 1, seq: 0x5a5a, type: FRAME_TYPES.ack, flags: 0, stripMask: 0, payload }));
 }
 
+/** NAK 帧（payload = ack_seq(2) + err(1)）；帧头 seq 用独立值，验证 payload 关联。 */
+function nakHex(seq: number, err = 0x06): string {
+  const payload = new Uint8Array([seq & 0xff, (seq >> 8) & 0xff, err]);
+  return bytesToHex(encode({ version: 1, seq: 0x6b6b, type: FRAME_TYPES.nak, flags: 0, stripMask: 0, payload }));
+}
+
 /** 用 FakeTransport 组装（BleLink, LightService)，notifySettleMs=0 提速。 */
-function setup(options: { notifyFrames?: string[]; mtu?: number; autoReconnect?: boolean } = {}) {
+function setup(options: { notifyFrames?: string[]; mtu?: number; autoReconnect?: boolean; ackTimeoutMs?: number } = {}) {
   const transport = new FakeTransport({
     notifyFrames: options.notifyFrames ?? [],
     ...(options.mtu === undefined ? {} : { mtu: options.mtu }),
@@ -61,7 +67,9 @@ function setup(options: { notifyFrames?: string[]; mtu?: number; autoReconnect?:
     // 默认关闭自动重连：多数用例不关心重连，关掉可避免断连后 reconnect timer 泄漏。
     autoReconnect: options.autoReconnect ?? false,
   });
-  const service = new LightService(link);
+  const service = new LightService(link, {
+    ...(options.ackTimeoutMs === undefined ? {} : { ackTimeoutMs: options.ackTimeoutMs }),
+  });
   return { service, link, transport };
 }
 
@@ -359,20 +367,43 @@ describe("LightService 写结果（ACK / NAK）", () => {
     await expect(pending).rejects.toMatchObject({ code: "SERVICE_NAK", nakCode: 0x06 });
   });
 
-  it("无 ACK 时 500ms 超时抛 TimeoutError，且只发一次不自动重试", async () => {
-    const { service, transport } = setup({ mtu: 247 });
+  it("无 ACK 时重传整帧最多 3 次后抛 TimeoutError（发送端超时重传）", async () => {
+    const { service, transport } = setup({ mtu: 247, ackTimeoutMs: 20 });
     await connectVia(service);
     await expect(service.setEffect(0xff, { effect: "off" })).rejects.toBeInstanceOf(TimeoutError);
+    // 首发 1 次 + 重传 2 次 = 共 3 次写出（ACK_MAX_ATTEMPTS）。
+    expect(transport.opCount("write")).toBe(ACK_MAX_ATTEMPTS);
+  });
+
+  it("首次 ACK 超时后重传整帧，重传收到 ACK 则 resolve（只重传该帧）", async () => {
+    const { service, transport } = setup({ mtu: 247, ackTimeoutMs: 50 });
+    await connectVia(service);
+    const pending = service.setEffect(0xff, { effect: "off" });
+    // 首次写后不回 ACK，等首次超时（50ms），再回重传帧的 ACK。
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    transport.emitNotification(ackHexFor(0));
+    await expect(pending).resolves.toBeUndefined();
+    expect(transport.opCount("write")).toBe(2); // 首发 + 1 次重传
+  });
+
+  it("收到 NAK 立即停止，不重传", async () => {
+    const { service, transport } = setup({ mtu: 247, ackTimeoutMs: 20 });
+    await connectVia(service);
+    const pending = service.setEffect(0xff, { effect: "static", color: { r: 255, g: 255, b: 255 } });
+    // 未解锁：超限 NAK 0x06，应立即停止，不重传。
+    transport.emitNotification(nakHex(0));
+    await expect(pending).rejects.toMatchObject({ code: "SERVICE_NAK", nakCode: 0x06 });
     expect(transport.opCount("write")).toBe(1);
   });
 
-  it("写失败（10006）立即 reject NOT_CONNECTED，不等超时", async () => {
+  it("写失败（10006）立即 reject NOT_CONNECTED，不等超时、不重传", async () => {
     const { service, transport } = setup({ mtu: 247 });
     await connectVia(service);
     transport.enqueueFailure("write", 10006);
     await expect(service.setEffect(0xff, { effect: "off" })).rejects.toMatchObject({
       code: "NOT_CONNECTED",
     });
+    expect(transport.opCount("write")).toBe(1);
   });
 });
 

@@ -8,10 +8,10 @@
  * - 设备事件：`hello` / `status` 属性 + `onStatus` 回调（#17 UI 可直接订阅）。
  *
  * 写结果语义（#4 决议第 4 节）：
- * - setEffect 帧 flags bit0=1 请求 ACK；收到同 seq ACK → resolve。
+ * - setEffect 帧 flags bit0=1 请求 ACK；收到同 seq ACK（payload ack_seq 关联）→ resolve。
  * - 收到 NAK → 立即 reject（不自动重试，协议口径）。
- * - 500ms 无 ACK → reject TimeoutError（发送端超时，只发一次）。
- * - 写失败（如断连 10006）由 BleLink 先行 reject，等 ACK 的 Promise 随之 settle。
+ * - 500ms 无 ACK → 重传整帧（走正常写路径），最多 3 次尝试；仍无 ACK → reject TimeoutError。
+ * - 写失败（如断连 10006）由 BleLink 先行 reject，等 ACK 的 Promise 随之 settle（不重传）。
  *
  * 纯 TS：不引用任何 wx / Page / Component / getApp（CI check-purity 强制）。
  */
@@ -21,8 +21,10 @@ import { encode, feed, FRAME_TYPES, PROTOCOL_VERSION } from "./codec";
 import type { Frame } from "./codec";
 import { BleDomainError, InvalidStateError, TimeoutError } from "./errors";
 
-/** 协议常量：ACK 等待超时（#4 决议第 4 节）。 */
+/** 协议常量：ACK 等待超时与重传上限（#4 决议第 4 节）。 */
 export const ACK_TIMEOUT_MS = 500;
+/** 发送端 ACK 超时后重传整帧的最大尝试次数（含首发）。 */
+export const ACK_MAX_ATTEMPTS = 3;
 
 /** C3 未设置过的灯带在 STATUS 里的 active_effect 值（firmware EFFECT_ID_NONE）。 */
 export const EFFECT_ID_NONE = 0xff;
@@ -439,28 +441,44 @@ export class LightService {
   private statusWaiter: { resolve: (status: LightStatus) => void; reject: (error: unknown) => void; timer: ReturnType<typeof setTimeout> | undefined } | undefined;
 
   private async writeAndWaitAck(frame: Uint8Array, seq: number): Promise<void> {
-    // 先挂 ACK 等待再写：C3 可能在 write 完成后极快回 ACK，pending 必须先就位。
-    const waiter: PendingWrite = { resolve: () => undefined, reject: () => undefined, timer: undefined };
-    const ackPromise = new Promise<void>((resolve, reject) => {
-      waiter.resolve = resolve;
-      waiter.reject = reject;
-      waiter.timer = setTimeout(() => {
+    // #4 §4：发送端超时 500ms 重传整帧（走正常写路径），最多 3 次尝试；
+    // 收到 NAK 立即停止，不自动重试。
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= ACK_MAX_ATTEMPTS; attempt += 1) {
+      // 先挂 ACK 等待再写：C3 可能在 write 完成后极快回 ACK，pending 必须先就位。
+      const waiter: PendingWrite = { resolve: () => undefined, reject: () => undefined, timer: undefined };
+      const ackPromise = new Promise<void>((resolve, reject) => {
+        waiter.resolve = resolve;
+        waiter.reject = reject;
+        waiter.timer = setTimeout(() => {
+          this.pending.delete(seq);
+          reject(new TimeoutError("ACK", this.ackTimeoutMs));
+        }, this.ackTimeoutMs);
+        this.pending.set(seq, waiter);
+      });
+      try {
+        // 重传与首发一致：走 BleLink 串行队列 + 分片，不绕开正常写路径。
+        await this.link.write(frame);
+      } catch (error) {
+        // 写失败（如断连 10006）：清理 pending，消费 ackPromise 避免悬挂
+        // unhandled，再抛出原始错误（写失败不重传）。
         this.pending.delete(seq);
-        reject(new TimeoutError("ACK", this.ackTimeoutMs));
-      }, this.ackTimeoutMs);
-      this.pending.set(seq, waiter);
-    });
-    try {
-      await this.link.write(frame);
-    } catch (error) {
-      // 写失败：清理 pending，消费 ackPromise 避免悬挂 unhandled，再抛出原始错误。
-      this.pending.delete(seq);
-      if (waiter.timer !== undefined) clearTimeout(waiter.timer);
-      waiter.reject(error);
-      await ackPromise.catch(() => undefined);
-      throw error;
+        if (waiter.timer !== undefined) clearTimeout(waiter.timer);
+        waiter.reject(error);
+        await ackPromise.catch(() => undefined);
+        throw error;
+      }
+      try {
+        await ackPromise;
+        return; // ACK 收到
+      } catch (error) {
+        lastError = error;
+        if (error instanceof ServiceNakError) throw error; // NAK 立即停
+        if (attempt >= ACK_MAX_ATTEMPTS) throw error; // 重传耗尽
+        // TimeoutError：前一个 pending 已被定时器 delete，继续下一轮重传。
+      }
     }
-    return ackPromise;
+    throw lastError ?? new TimeoutError("ACK", this.ackTimeoutMs);
   }
 
   /** 通知字节流入口：粘包 / 半帧重组 -> 帧 / 错误分发（Codec.feed 纯函数，状态是 remainder）。 */

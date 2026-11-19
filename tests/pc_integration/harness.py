@@ -10,7 +10,8 @@
 
 步骤（run_steps）：PC 分配 seq -> 记 t0（PC 单调时钟）-> 写 BLE ->
 轮询两侧产物（ACK/NAK/STATUS notify + 串口 JSONL 事件）-> checks.check_step
-交叉断言（Δ 默认 <500ms）。
+交叉断言（Δ 默认 <500ms）。ACK 步骤超时 500ms 重传整帧最多 3 次，收到 NAK
+立即停止（#4 §4，与小程序 LightService 同口径）。
 
 取证（dump_run）：每次跑落 runs/<UTC 时间戳>/：
 - serial_raw.log     原始串口（PC 收到时刻 + 行）
@@ -59,6 +60,8 @@ class HarnessConfig:
     baudrate: int = 115200
     # 时序断言
     notify_timeout_s: float = 3.0      # 单步两侧产物等待超时
+    ack_timeout_s: float = 0.5         # 单帧 ACK 等待超时（#4 §4，超时重传）
+    ack_max_attempts: int = 3          # ACK 步骤最大尝试次数（含首发，#4 §4）
     delta_limit_ms: int = DEFAULT_DELTA_MS       # 默认 Δ 上限
     connect_delta_limit_ms: int = CONNECT_DELTA_MS  # 连接/重连放宽档
     poll_interval_s: float = 0.01
@@ -344,28 +347,55 @@ class C3Harness:
         seq = self._next_seq()
         frame = dict(step.frame)
         frame["seq"] = seq
+        encoded = pc_protocol.encode(frame)
         t0 = self.clock()
-        await self.ble.write_cmd(pc_protocol.encode(frame))
-
-        await self._wait_for(
-            lambda: self._artifacts_ready(step.expect, seq, t0),
-            self.cfg.notify_timeout_s,
-            what=f"{step.name} 的两侧产物",
-        )
         limit = (
             step.delta_limit_ms
             if step.delta_limit_ms is not None
             else self.cfg.delta_limit_ms
         )
-        return check_step(
-            step.name,
-            step.expect,
-            seq,
-            t0,
-            timeline=self.ble.timeline,
-            serial_events=self._serial_events(),
-            delta_limit_ms=limit,
-            expect_status_fields=step.expect_status_fields,
+        # #4 §4：发送端超时 500ms 重传整帧最多 3 次；收到 NAK 立即停止。
+        # 仅对需要 ACK 的步骤（expect="ack"）重传；STATUS/NAK/HELLO 步骤保持
+        # 单次 + notify_timeout_s 等待（与"收到 ACK/NAK 或超时才发下一帧"一致）。
+        attempts = self.cfg.ack_max_attempts if step.expect == "ack" else 1
+        wait_s = self.cfg.ack_timeout_s if step.expect == "ack" else self.cfg.notify_timeout_s
+        outcome: Optional[StepOutcome] = None
+        for attempt in range(1, attempts + 1):
+            await self.ble.write_cmd(encoded)
+            ready = await self._wait_for(
+                lambda: self._artifacts_ready(step.expect, seq, t0),
+                wait_s,
+                what=f"{step.name} 的两侧产物（第 {attempt}/{attempts} 次）",
+            )
+            outcome = check_step(
+                step.name,
+                step.expect,
+                seq,
+                t0,
+                timeline=self.ble.timeline,
+                serial_events=self._serial_events(),
+                delta_limit_ms=limit,
+                expect_status_fields=step.expect_status_fields,
+            )
+            if outcome.ok:
+                return outcome
+            # 超时（无 ACK 也无 NAK）且还有重传机会 -> 重传整帧；
+            # 收到 NAK 立即停止，不重传（#4 §4）。
+            if (
+                not ready
+                and step.expect == "ack"
+                and attempt < attempts
+                and not self._nak_arrived(seq, t0)
+            ):
+                continue
+            return outcome
+        return outcome
+
+    def _nak_arrived(self, seq: int, t0: float) -> bool:
+        """本步是否已收到 NAK（同 seq 回显）——收到 NAK 立即停止重传。"""
+        return (
+            self.ble.find_notify(pc_protocol.FRAME_TYPES["nak"], seq, after_t0=t0)
+            is not None
         )
 
     async def run_steps(self, steps: list[Step]) -> list[StepOutcome]:
