@@ -5,6 +5,7 @@ idf_component_register(
          "../ports/esp32/led_task.c"
          "../ports/esp32/nvs_store.c"
          "../ports/esp32/nimble_gatt.c"
+         "../ports/esp32/event_log_port.c"
          "../app/app.c"
     INCLUDE_DIRS
         "."

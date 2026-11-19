@@ -16,6 +16,7 @@
 #include "nvs_flash.h"
 
 #include "esp_log.h"
+#include "event_log_port.h"
 #include "gatt.h"
 #include "led_task.h"
 
@@ -121,6 +122,8 @@ esp_err_t nvs_store_save_now(const scene_state_t *st)
     } else {
         ESP_LOGW(TAG, "scene save failed 0x%x", (unsigned)rc);
     }
+    /* #15：NVS 事件（PC 集成断言锚点：ACK 说成功，NVS 也得真存）。 */
+    event_log_emit_nvs_save((int)rc);
     return rc;
 }
 

@@ -1,0 +1,8 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+
+# 每次运行的取证目录（原始串口 / 解析 JSONL / notify 时间线 / summary）
+runs/

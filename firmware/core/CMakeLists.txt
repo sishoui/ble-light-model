@@ -1,5 +1,5 @@
 idf_component_register(
-    SRCS "ws2812.c" "scheduler.c" "console.c" "scene.c" "gatt.c"
+    SRCS "ws2812.c" "scheduler.c" "console.c" "scene.c" "gatt.c" "event_log.c"
     INCLUDE_DIRS "."
     REQUIRES "proto"
 )

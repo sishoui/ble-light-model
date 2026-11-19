@@ -30,6 +30,7 @@
 
 #include "console.h"
 #include "effect_engine.h"
+#include "event_log_port.h"
 #include "led_task.h"
 #include "nimble_gatt.h"
 #include "nvs_store.h"
@@ -114,6 +115,16 @@ static void console_respond(const char *msg)
     usb_serial_jtag_write_bytes(msg, strlen(msg), portMAX_DELAY);
 }
 
+/* 事件日志写出回调（#15）：JSONL 行经 USB CDC 输出。
+ * 尽力而为：无 host 时 USB CDC 写不进 —— 有界超时后弃行（取证日志允许
+ * 丢行，绝不让 console 任务无限阻塞；console 自身的应答沿用原有
+ * portMAX_DELAY 交互语义）。 */
+static void event_log_usb_write(const char *data, size_t len, void *ctx)
+{
+    (void)ctx;
+    (void)usb_serial_jtag_write_bytes(data, len, pdMS_TO_TICKS(50));
+}
+
 static char line_buf[BLE_LIGHT_CONSOLE_LINE_MAX];
 static size_t line_len;
 
@@ -173,6 +184,8 @@ static void console_task(void *arg)
         for (int i = 0; i < n; i++) {
             feed_byte((char)buf[i]);
         }
+        /* #15：事件日志排空（每行 ~80B，最坏 100ms 延迟，Δ 断言 500ms 内）。 */
+        event_log_flush();
     }
 }
 
@@ -181,6 +194,11 @@ static void console_task(void *arg)
 esp_err_t app_init(void)
 {
     esp_err_t err;
+
+    /* #15：事件日志（JSONL，PC 集成断言锚点）最先装配 —— 后续所有阶段的
+     * 粘合事件都进环，由 console 任务排到 USB CDC。 */
+    event_log_init();
+    event_log_attach(event_log_usb_write, NULL);
 
     err = led_task_start();
     if (err != ESP_OK) {
@@ -216,5 +234,8 @@ esp_err_t app_init(void)
 
     ESP_LOGI(TAG, "selftest start");
     app_run_selftest();
+
+    /* #15：装配完成事件（PC 侧等这行 / "ready" 判断启动完成）。 */
+    event_log_emit_boot("0.1.0");
     return ESP_OK;
 }

@@ -28,6 +28,7 @@
 #include "esp_timer.h"
 
 #include "ble_proto.h"
+#include "event_log_port.h"
 #include "gatt.h"
 #include "led_task.h"
 #include "nvs_store.h"
@@ -123,6 +124,8 @@ static void send_ack(uint16_t seq)
     payload[0] = (uint8_t)(seq & 0xFFu);
     payload[1] = (uint8_t)(seq >> 8);
     (void)send_frame(BLE_PROTO_TYPE_ACK, gatt_tx_seq++, payload, 2u);
+    /* #15：ACK 事件（seq 回显；发送意图口径，传输失败另有 ESP_LOGW）。 */
+    event_log_emit_ack(seq);
 }
 
 static void send_nak(uint16_t seq, uint8_t code)
@@ -133,6 +136,8 @@ static void send_nak(uint16_t seq, uint8_t code)
     payload[1] = (uint8_t)(seq >> 8);
     payload[2] = code;
     (void)send_frame(BLE_PROTO_TYPE_NAK, gatt_tx_seq++, payload, 3u);
+    /* #15：NAK 事件（err = NAK 错误码，PC 与 notify 帧交叉断言）。 */
+    event_log_emit_nak(seq, code);
 }
 
 /* ---- HELLO / STATUS ---- */
@@ -149,10 +154,11 @@ static void send_hello(void)
                      sizeof(payload));
 }
 
-static void send_status(void)
+static void send_status(uint16_t seq)
 {
     led_shared_t shared;
     uint8_t payload[GATT_STATUS_PAYLOAD_LEN];
+    uint16_t glitch = led_task_glitch_count();
 
     led_task_snapshot(&shared);
     /* temp_c / current_ma_est：C3 无温度传感器（报 0），current 按点亮
@@ -164,13 +170,16 @@ static void send_status(void)
                       (uint16_t)((uint32_t)shared.brightness * 60u * 8u *
                                  20u / 255u),
                       GATT_THERMAL_NORMAL,
-                      led_task_glitch_count(),
+                      glitch,
                       s_drop_count,
                       shared.brightness,
                       (uint16_t)nvs_store_power_limit(),
                       0u, &shared.effects);
     (void)send_frame(BLE_PROTO_TYPE_STATUS, gatt_tx_seq++, payload,
                      sizeof(payload));
+    /* #15：STATUS 事件（seq = 触发帧序号，周期 STATUS 为 0）。字段与
+     * STATUS payload 同源 —— PC 侧交叉断言 "notify 说 X，日志也得说 X"。 */
+    event_log_emit_status(seq, shared.brightness, glitch, s_drop_count);
 }
 
 /* ---- 动作执行（core gatt_dispatch 的输出落地） ---- */
@@ -243,7 +252,7 @@ static void on_frame(const ble_proto_frame_t *f)
             }
             break;
         case GATT_ACT_STATUS:
-            send_status();
+            send_status(f->seq);
             break;
         case GATT_ACT_NAK:
             send_nak(a->seq, a->error);
@@ -273,6 +282,7 @@ static int on_cmd_write(uint16_t conn_handle, uint16_t attr_handle,
         /* 缓冲溢出：丢弃半帧（drop_count 口径），从空重新开始。 */
         s_drop_count++;
         ble_proto_feed_reset(&gatt_feed);
+        event_log_emit_drop("feed_overflow", 0u);
         return 0;
     }
     ble_proto_frame_t frames[4];
@@ -284,9 +294,14 @@ static int on_cmd_write(uint16_t conn_handle, uint16_t attr_handle,
 
     for (size_t i = 0u; i < errors_written; i++) {
         s_drop_count++;
+        /* #15：错误帧事件（err = NAK 码；NAK notify 由 send_nak 发）。 */
+        event_log_emit_drop("parse", errors[i].code);
         send_nak(errors[i].seq, errors[i].code);
     }
     for (size_t i = 0u; i < nf; i++) {
+        /* #15：RX 事件 —— PC 交叉断言的 seq 关联起点（Δ 计时锚）。 */
+        event_log_emit_rx(frames[i].seq, frames[i].type, frames[i].flags,
+                          frames[i].payload_len);
         on_frame(&frames[i]);
     }
     return 0;
@@ -349,6 +364,7 @@ static int on_gap_event(struct ble_gap_event *event, void *arg)
             gatt_subscribed = 0u;
             ble_proto_feed_reset(&gatt_feed);
             ESP_LOGI(TAG, "connected handle=%u", gatt_conn_handle);
+            event_log_emit_connect();
 
             /* 连接参数：50–100ms 间隔（外设侧请求，#7 §5）。 */
             struct ble_gap_upd_params params = {
@@ -377,6 +393,7 @@ static int on_gap_event(struct ble_gap_event *event, void *arg)
         ble_proto_feed_reset(&gatt_feed);
         ESP_LOGI(TAG, "disconnected (reason=%d); restart advertising",
                  event->disconnect.reason);
+        event_log_emit_disconnect(event->disconnect.reason);
         start_advertise();
         break;
 
@@ -392,11 +409,13 @@ static int on_gap_event(struct ble_gap_event *event, void *arg)
         if (gatt_subscribed) {
             send_hello();
         }
+        event_log_emit_subscribe(event->subscribe.cur_notify);
         break;
 
     case BLE_GAP_EVENT_MTU:
         ESP_LOGI(TAG, "MTU updated: %u (passive follow)",
                  event->mtu.value);
+        event_log_emit_mtu(event->mtu.value);
         break;
 
     default:
@@ -434,7 +453,7 @@ static void on_tick(void *arg)
     if (gatt_connected && gatt_subscribed &&
         (uint32_t)(now - gatt_last_status_ms) >= STATUS_PERIOD_MS) {
         gatt_last_status_ms = now;
-        send_status();
+        send_status(0u);
     }
 }
 

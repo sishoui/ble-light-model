@@ -20,6 +20,7 @@
 #include "freertos/task.h"
 
 #include "effect_engine.h"
+#include "event_log_port.h"
 #include "rmt_driver.h"
 #include "rmt_switch.h"
 #include "scheduler.h"
@@ -34,6 +35,9 @@ static const char *TAG = "led";
 /* NimBLE（#14）与 LED 任务的唯一数据面。 */
 static led_shared_t shared;
 static sched_ctx_t sched;
+
+/* #15：glitch 累计值变化检测（事件日志去重口径）。 */
+static uint16_t s_last_glitch;
 
 /* led_task_set_shared 与 LED 任务之间的临界区（取快照瞬间）。 */
 static portMUX_TYPE shared_mux = portMUX_INITIALIZER_UNLOCKED;
@@ -126,6 +130,12 @@ static void led_task(void *arg)
         }
         /* 传输窗口结束：轮次间隙（日志/堆操作可在此做）。 */
         rmt_switch_all_off();
+        /* #15：glitch 累计值变化事件（PC 集成断言锚点，事件级去重：
+         * 只在计数变化时发一行）。 */
+        if (sched.glitch_count != s_last_glitch) {
+            s_last_glitch = sched.glitch_count;
+            event_log_emit_glitch(s_last_glitch);
+        }
 
         vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(SCHED_REFRESH_MS));
     }

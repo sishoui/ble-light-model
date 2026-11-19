@@ -40,6 +40,39 @@ SELFTEST                             # 上电自检序列（L0→L7 逐条点亮
 
 每行回 `OK` / `ERR` / 事件行（`ready` / `SELFTEST`）。
 
+## 串口事件日志（USB CDC，#15）
+
+固件经 USB CDC 输出事件级 JSONL 行，作为 PC 集成测试（tests/pc_integration）
+的断言锚点。每行纯 JSON，例：
+
+```
+{"t_ms":12345,"seq":7,"ev":"rx","type":2,"flags":1,"len":4}
+```
+
+通用字段：`t_ms`（C3 单调毫秒，仅供 PC 排序，不作跨机断言基准）、`seq`
+（关联键；无关联帧时为 0）、`ev`（事件种类）。事件种类：
+
+| ev | 字段 | 触发点 |
+|---|---|---|
+| `boot` | `fw` | 上电装配完成 |
+| `gap` | `what`=connect/disconnect/subscribe/mtu + `reason`/`notify`/`mtu` | GAP 事件 |
+| `rx` | `type` `flags` `len` | CMD 帧解出（seq = 帧序号，Δ 计时锚） |
+| `ack` | — | ACK notify 发出（seq 回显） |
+| `nak` | `err` | NAK notify 发出（seq 回显 + NAK 码） |
+| `status` | `brightness` `glitch` `drop` | STATUS 帧发出（周期 STATUS seq=0） |
+| `nvs` | `op`=save `rc` | NVS 场景保存结果 |
+| `drop` | `reason`=feed_overflow/parse（+`err`） | 协议层丢帧 |
+| `glitch` | `count` | 调度 glitch 累计值变化 |
+
+实现为 `ports/esp32/event_log_port.{c,h}`（粘合）+ `core/event_log.{c,h}`
+（纯函数：JSON 转义 + 定长环形缓冲，无动态内存）。调用点散布在
+app（boot）、nimble_gatt（connect/disconnect/subscribe/mtu/rx/ack/nak/
+status/parse）、led_task（glitch）、nvs_store（nvs save）。单行最长 160B、
+环形缓冲 8 行、满则丢最旧；由 console 任务周期（≤100ms）排空到 USB CDC。
+无 host 时 USB CDC 写尽力而为（超时弃行），不阻塞 console 任务。
+
+host 单测覆盖 writer 转义与环形缓冲行为（`test_event_log`，`pio test -e native`）。
+
 ## BLE GATT 布局（#14 定稿，PC/小程序共用）
 
 | 项 | 值 |
