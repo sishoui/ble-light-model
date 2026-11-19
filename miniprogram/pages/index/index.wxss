@@ -1,0 +1,182 @@
+/* 首页样式（tracer bullet，简洁可用即可；#17 做完整 UI）。 */
+page {
+  background: #16213e;
+  color: #e8e8e8;
+  font-family: -apple-system, "PingFang SC", sans-serif;
+}
+
+.page {
+  padding: 24rpx;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24rpx;
+}
+
+.title {
+  font-size: 40rpx;
+  font-weight: 600;
+}
+
+.state {
+  font-size: 24rpx;
+  padding: 6rpx 16rpx;
+  border-radius: 999rpx;
+  background: #0f3460;
+  color: #e8e8e8;
+}
+
+.state--ready {
+  background: #1b7a43;
+}
+
+.state--fault,
+.state--reconnecting {
+  background: #a83232;
+}
+
+.section {
+  background: #1f2a4a;
+  border-radius: 16rpx;
+  padding: 24rpx;
+  margin-bottom: 24rpx;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16rpx;
+}
+
+.section-title {
+  font-size: 28rpx;
+  color: #b8c0d8;
+  margin-bottom: 12rpx;
+}
+
+.btn {
+  background: #0f3460;
+  color: #e8e8e8;
+  font-size: 28rpx;
+  border-radius: 12rpx;
+  padding: 0 32rpx;
+}
+
+.btn--ghost {
+  background: transparent;
+  border: 1rpx solid #4a5578;
+}
+
+.btn--primary {
+  background: #1b7a43;
+  width: 100%;
+  margin-top: 16rpx;
+}
+
+.btn--small {
+  font-size: 24rpx;
+  padding: 0 20rpx;
+}
+
+.btn[disabled] {
+  opacity: 0.5;
+}
+
+.device-list {
+  margin-top: 8rpx;
+}
+
+.device {
+  display: flex;
+  justify-content: space-between;
+  padding: 16rpx 20rpx;
+  border-radius: 12rpx;
+  margin-bottom: 8rpx;
+  background: #27335a;
+}
+
+.device--active {
+  outline: 2rpx solid #4a90d9;
+}
+
+.device-name {
+  font-size: 28rpx;
+}
+
+.device-rssi {
+  font-size: 24rpx;
+  color: #8a94b0;
+}
+
+.hint {
+  font-size: 24rpx;
+  color: #8a94b0;
+  padding: 12rpx 0;
+}
+
+.info {
+  font-size: 24rpx;
+  color: #b8c0d8;
+  margin-bottom: 8rpx;
+}
+
+.effect-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin: 16rpx 0;
+}
+
+.effect {
+  padding: 12rpx 24rpx;
+  border-radius: 12rpx;
+  background: #27335a;
+  font-size: 26rpx;
+}
+
+.effect--active {
+  background: #4a90d9;
+  color: #fff;
+}
+
+.sliders {
+  margin: 16rpx 0;
+}
+
+.slider-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8rpx;
+}
+
+.slider-row text {
+  width: 56rpx;
+  font-size: 24rpx;
+  color: #b8c0d8;
+}
+
+.slider-row slider {
+  flex: 1;
+}
+
+.sliders-sub {
+  margin-top: 12rpx;
+  padding-top: 12rpx;
+  border-top: 1rpx solid #33406a;
+}
+
+.log {
+  font-family: "SF Mono", "Menlo", monospace;
+  font-size: 22rpx;
+  color: #8a94b0;
+  max-height: 320rpx;
+  overflow-y: auto;
+}
+
+.log-line {
+  padding: 4rpx 0;
+}

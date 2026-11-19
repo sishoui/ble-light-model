@@ -3,12 +3,17 @@
  *
  * 整个工程里唯一允许触碰微信运行时的模块（位于 logic/ 之外，CI check-purity 不覆盖；
  * 逻辑层单测用 FakeTransport 顶替，不加载本文件）。职责边界：
- * - 回调 / Promise 归一：异步 API 直接用 Promise 风格（基础库 2.10.2+）。
- * - 失败原样 reject `{ errCode, errMsg }`（保留原始码，领域错误映射在 BleLink）。
- * - 不做写串行化 / 分片 / 超时 / 重连 —— 那些是 BleLink 的职责。
+ * - 回调 / Promise 归一：异步 API 直接用 Promise 风格（基础库 2.10.2+），失败原样
+ *   reject `{ errCode, errMsg }`（保留原始码，领域错误映射在 BleLink）。
+ * - 事件监听（onXxx）在构造期一次性注册，归一后分发给 BleLink 注册的 listener。
+ * - 不做写串行化 / 分片 / 超时 / 重连 / writeType 推导 —— 那些是 BleLink 的职责。
  *
- * 真机薄壳的完整实现（writeType 按特征属性推导的兜底、setBLEMTU 兼容性、iOS uuid
- * 处理、错误回调归一等打磨）是工单 #16 的事；本骨架保证接口完整、可编译。
+ * 真机薄壳的打磨点（工单 #16）：
+ * - writeType 由 BleLink 按特征属性（properties.write / writeNoResponse）推导后透传。
+ * - setBLEMTU 协商失败由 BleLink.negotiateMtu 兜底（20 字节分片），本层只透传原始失败。
+ * - iOS uuid 必须来自发现接口（不能硬编码），BleLink 从 getCharacteristics 结果取 uuid；
+ *   本层对 uuid 原样透传（大小写归一由 BleLink 负责）。
+ * - platform 检测依次尝试 getDeviceInfo / getSystemInfoSync（新 / 老基础库）。
  */
 
 import type {
@@ -34,6 +39,7 @@ export class WxTransport implements Transport {
 
   constructor(wxApi: WxApi = getWx()) {
     this.wxApi = wxApi;
+    // wx 的 onXxx 无对应 off；页面持有单例，构造一次，生命周期与页面一致。
     this.wxApi.onBluetoothDeviceFound((result) => {
       for (const listener of this.deviceFoundListeners) listener(result.devices);
     });
@@ -49,7 +55,8 @@ export class WxTransport implements Transport {
   }
 
   platform(): Platform {
-    const platform = this.wxApi.getDeviceInfo?.().platform;
+    const info = this.wxApi.getDeviceInfo?.() ?? this.wxApi.getSystemInfoSync?.();
+    const platform = info?.platform;
     if (platform === "android" || platform === "ios") return platform;
     return "other";
   }

@@ -59,6 +59,8 @@ export interface WxBleMtuChangeResult {
 /** WxTransport 用到的 wx.* BLE API 子集（全部为 Promise 风格）。 */
 export interface WxApi {
   getDeviceInfo?(): { platform?: string };
+  /** 基础库 2.20.1 前 platform 检测的兜底（同步 API）。 */
+  getSystemInfoSync?(): { platform?: string };
   openBluetoothAdapter(): Promise<unknown>;
   closeBluetoothAdapter(): Promise<unknown>;
   startBluetoothDevicesDiscovery(options: { allowDuplicatesKey?: boolean; services?: string[] }): Promise<unknown>;
@@ -94,9 +96,11 @@ export interface WxApi {
 
 /** 取全局 wx；宿主未提供时抛错（Node 单测不加载本文件，由 FakeTransport 顶替）。 */
 export function getWx(): WxApi {
-  const candidate = (globalThis as { wx?: WxApi }).wx;
+  // globalThis.wx 在装了 miniprogram-api-typings 后是官方 wx 类型；这里以 unknown 中转，
+  // 只取本文件声明的最小子集，不依赖官方类型（保证 WxTransport 可脱离微信运行时被 tsc 检查）。
+  const candidate = (globalThis as { wx?: unknown }).wx;
   if (candidate === undefined) {
     throw new Error("当前宿主没有 wx 对象（WxTransport 只在微信小程序运行时可用）");
   }
-  return candidate;
+  return candidate as WxApi;
 }

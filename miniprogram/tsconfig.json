@@ -13,7 +13,8 @@
     "noFallthroughCasesInSwitch": true,
     "exactOptionalPropertyTypes": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "types": ["miniprogram-api-typings", "node"]
   },
-  "include": ["logic/**/*.ts", "transport/**/*.ts"]
+  "include": ["logic/**/*.ts", "transport/**/*.ts", "pages/**/*.ts", "app.ts"]
 }
