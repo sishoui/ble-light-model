@@ -72,6 +72,11 @@ export interface FakeTransportOptions {
   notifyFrames?: string[];
   /** 各阶段延迟（ms），模拟慢速回调。 */
   delays?: Partial<Record<FailPhase, number>>;
+  /**
+   * 设备侧写拦截钩子（设备模型用）：每次 write 落盘后同步调用，参数为本次写入的原始字节。
+   * 用于 FakeLightDevice 之类的 C3 行为模型在 write 时立即回 ACK / NAK / STATUS。
+   */
+  onWrite?: (bytes: Uint8Array) => void;
 }
 
 export const DEFAULT_DEVICE_ID = "C3-A1";
@@ -140,6 +145,7 @@ export class FakeTransport implements Transport {
   private adapterOpened = false;
   private hangWrites = 0;
   private lastNotifyTarget: { deviceId: string; serviceId: string; characteristicId: string } | null = null;
+  private readonly onWriteHook: ((bytes: Uint8Array) => void) | undefined;
 
   constructor(options: FakeTransportOptions = {}) {
     this.platformName = options.platform ?? "android";
@@ -151,6 +157,7 @@ export class FakeTransport implements Transport {
     this.nowFn = options.now ?? (() => Date.now());
     this.advertiseRepeats = options.advertiseRepeats ?? 1;
     this.notifyFrames = options.notifyFrames ?? [];
+    this.onWriteHook = options.onWrite;
     for (const [phase, delay] of Object.entries(options.delays ?? {})) {
       this.delays.set(phase as FailPhase, delay);
     }
@@ -340,6 +347,8 @@ export class FakeTransport implements Transport {
         writeType,
         at: this.nowFn(),
       });
+      // 设备模型拦截：把本次写入原始字节交给钩子（FakeLightDevice 在内部解码并回帧）。
+      this.onWriteHook?.(new Uint8Array(value.slice(0)));
     });
   }
 

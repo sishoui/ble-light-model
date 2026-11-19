@@ -1,10 +1,14 @@
-<!-- 首页（tracer bullet，工单 #16）：扫描 → 连接 → 设灯效。UI 从简，#17 做完整界面。 -->
+<!-- 完整控制 UI（工单 #17）：扫描/连接 · 7 灯效 × 单/多 strip_mask · 亮度/限流/解锁 · STATUS。 -->
 <view class="page">
   <view class="header">
     <text class="title">BLE Light</text>
     <text class="state state--{{state}}">{{stateText}}</text>
   </view>
 
+  <!-- 断连重连横幅（断连双路径①：onConnectionStateChange(false) → reconnecting）。 -->
+  <view wx:if="{{reconnecting}}" class="banner banner--warn">连接断开，重连中…</view>
+
+  <!-- 连接区 -->
   <view class="section">
     <view class="row">
       <button class="btn" bindtap="onScan" loading="{{scanning}}" disabled="{{scanning || connected}}">
@@ -28,61 +32,151 @@
     <view wx:elif="{{!connected && !scanning}}" class="hint">点击"扫描设备"发现 C3（BLELight-C3）</view>
   </view>
 
-  <view wx:if="{{connected}}" class="section">
-    <view class="row">
-      <text class="section-title">已连接：{{deviceName}}</text>
-      <button class="btn btn--small" bindtap="onRefreshStatus">刷新状态</button>
-    </view>
-    <view wx:if="{{helloText}}" class="info">{{helloText}}</view>
-    <view wx:if="{{statusText}}" class="info">{{statusText}}</view>
-
-    <view class="effect-grid">
-      <view
-        wx:for="{{effects}}"
-        wx:key="key"
-        class="effect {{selectedEffect === index ? 'effect--active' : ''}}"
-        data-index="{{index}}"
-        bindtap="onSelectEffect"
-      >
-        {{item.name}}
+  <!-- 控制区（连接后） -->
+  <block wx:if="{{connected}}">
+    <view class="section">
+      <view class="row">
+        <text class="section-title">已连接：{{deviceName}}</text>
+        <button class="btn btn--small" bindtap="onRefreshStatus">刷新状态</button>
       </view>
+      <view wx:if="{{helloText}}" class="info">{{helloText}}</view>
     </view>
 
-    <view wx:if="{{selectedNeedsColor}}" class="sliders">
-      <view class="slider-row">
-        <text>R</text>
-        <slider min="0" max="255" value="{{colorR}}" activeColor="#ff4444" bindchange="onColorR" />
+    <!-- STATUS 实时显示 -->
+    <view class="section">
+      <view class="section-title">设备状态（STATUS）</view>
+      <view wx:if="{{status}}" class="status-grid">
+        <view class="status-cell"><text class="k">运行</text><text class="v">{{status.uptime}}</text></view>
+        <view class="status-cell"><text class="k">温度</text><text class="v">{{status.temp}}</text></view>
+        <view class="status-cell"><text class="k">估算电流</text><text class="v">{{status.current}}</text></view>
+        <view class="status-cell"><text class="k">热状态</text><text class="v">{{status.thermal}}</text></view>
+        <view class="status-cell"><text class="k">亮度</text><text class="v">{{status.brightness}}</text></view>
+        <view class="status-cell"><text class="k">限流</text><text class="v">{{status.powerLimit}}</text></view>
+        <view class="status-cell"><text class="k">毛刺/丢帧</text><text class="v">{{status.glitch}}/{{status.drop}}</text></view>
+        <view class="status-cell"><text class="k">灯带故障</text><text class="v">{{status.stripFault}}</text></view>
       </view>
-      <view class="slider-row">
-        <text>G</text>
-        <slider min="0" max="255" value="{{colorG}}" activeColor="#44ff44" bindchange="onColorG" />
-      </view>
-      <view class="slider-row">
-        <text>B</text>
-        <slider min="0" max="255" value="{{colorB}}" activeColor="#4444ff" bindchange="onColorB" />
-      </view>
+      <view wx:if="{{status}}" class="status-active">灯效：{{status.active}}</view>
+      <view wx:else class="hint">等待 C3 STATUS…</view>
+    </view>
 
-      <view wx:if="{{selectedNeedsColor2}}" class="sliders-sub">
-        <view class="slider-row">
-          <text>R2</text>
-          <slider min="0" max="255" value="{{color2R}}" activeColor="#ff4444" bindchange="onColor2R" />
+    <!-- strip_mask 选择 -->
+    <view class="section">
+      <view class="row">
+        <text class="section-title">灯带选择（strip_mask）</text>
+        <text class="mask">{{maskText}}</text>
+      </view>
+      <view class="lanes">
+        <view
+          wx:for="{{lanes}}"
+          wx:key="*this"
+          class="lane {{item ? 'lane--on' : ''}}"
+          data-index="{{index}}"
+          bindtap="onToggleLane"
+        >
+          L{{index}}
         </view>
-        <view class="slider-row">
-          <text>G2</text>
-          <slider min="0" max="255" value="{{color2G}}" activeColor="#44ff44" bindchange="onColor2G" />
-        </view>
-        <view class="slider-row">
-          <text>B2</text>
-          <slider min="0" max="255" value="{{color2B}}" activeColor="#4444ff" bindchange="onColor2B" />
-        </view>
+      </view>
+      <view class="row lane-actions">
+        <button class="btn btn--tiny" data-all="true" bindtap="onSelectAllLanes">全选</button>
+        <button class="btn btn--tiny btn--ghost" data-all="false" bindtap="onSelectAllLanes">清空</button>
       </view>
     </view>
 
-    <button class="btn btn--primary" bindtap="onApply" loading="{{applying}}" disabled="{{applying}}">
-      {{applying ? '应用中…' : '应用到整灯带（mask 0xFF）'}}
-    </button>
-  </view>
+    <!-- 灯效网格 -->
+    <view class="section">
+      <view class="section-title">灯效（7 种）</view>
+      <view class="effect-grid">
+        <view
+          wx:for="{{effects}}"
+          wx:key="key"
+          class="effect {{selectedEffect === index ? 'effect--active' : ''}}"
+          data-index="{{index}}"
+          bindtap="onSelectEffect"
+        >
+          {{item.name}}
+        </view>
+      </view>
 
+      <!-- 颜色 -->
+      <view wx:if="{{selectedNeedsColor}}" class="sliders">
+        <view class="slider-row">
+          <text>R</text>
+          <slider min="0" max="255" value="{{colorR}}" activeColor="#ff4444" bindchange="onColorR" />
+          <text class="slider-val">{{colorR}}</text>
+        </view>
+        <view class="slider-row">
+          <text>G</text>
+          <slider min="0" max="255" value="{{colorG}}" activeColor="#44ff44" bindchange="onColorG" />
+          <text class="slider-val">{{colorG}}</text>
+        </view>
+        <view class="slider-row">
+          <text>B</text>
+          <slider min="0" max="255" value="{{colorB}}" activeColor="#4444ff" bindchange="onColorB" />
+          <text class="slider-val">{{colorB}}</text>
+        </view>
+
+        <view wx:if="{{selectedNeedsColor2}}" class="sliders-sub">
+          <view class="sub-title">渐变第二色</view>
+          <view class="slider-row">
+            <text>R2</text>
+            <slider min="0" max="255" value="{{color2R}}" activeColor="#ff4444" bindchange="onColor2R" />
+            <text class="slider-val">{{color2R}}</text>
+          </view>
+          <view class="slider-row">
+            <text>G2</text>
+            <slider min="0" max="255" value="{{color2G}}" activeColor="#44ff44" bindchange="onColor2G" />
+            <text class="slider-val">{{color2G}}</text>
+          </view>
+          <view class="slider-row">
+            <text>B2</text>
+            <slider min="0" max="255" value="{{color2B}}" activeColor="#4444ff" bindchange="onColor2B" />
+            <text class="slider-val">{{color2B}}</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 效果主参数 -->
+      <view wx:if="{{effectParamLabel}}" class="sliders">
+        <view class="slider-row">
+          <text class="param-label">{{effectParamLabel}}</text>
+          <slider min="0" max="5000" value="{{effectParam}}" bindchange="onEffectParam" />
+          <text class="slider-val">{{effectParam}}</text>
+        </view>
+      </view>
+
+      <button class="btn btn--primary" bindtap="onApplyEffect" loading="{{applying}}" disabled="{{applying}}">
+        {{applying ? '应用中…' : '应用灯效 → ' + maskText}}
+      </button>
+    </view>
+
+    <!-- 亮度 / 限流 / 解锁 -->
+    <view class="section">
+      <view class="section-title">亮度 / 限流 / 满功率</view>
+      <view class="slider-row">
+        <text class="param-label">亮度</text>
+        <slider min="0" max="255" value="{{brightness}}" bindchange="onBrightness" />
+        <text class="slider-val">{{brightness}}</text>
+      </view>
+      <view wx:if="{{brightness > 127 && !fullPowerUnlocked}}" class="warn-inline">超 50% 需满功率解锁，否则将被拒绝（NAK 0x06）</view>
+      <button class="btn btn--small" bindtap="onApplyBrightness">应用亮度</button>
+
+      <view class="slider-row limit-row">
+        <text class="param-label">限流(mA)</text>
+        <slider min="1000" max="30000" step="500" value="{{powerLimit}}" bindchange="onPowerLimit" />
+        <text class="slider-val">{{powerLimit}}</text>
+      </view>
+      <view wx:if="{{powerLimit > 15000 && !fullPowerUnlocked}}" class="warn-inline">超 15000mA 需满功率解锁，否则将被拒绝（NAK 0x06）</view>
+      <button class="btn btn--small" bindtap="onApplyPowerLimit">应用限流</button>
+
+      <view class="unlock-row">
+        <text class="param-label">满功率解锁</text>
+        <switch checked="{{fullPowerUnlocked}}" bindchange="onToggleUnlock" />
+      </view>
+      <view class="hint">解锁仅在本次连接有效，断连 / 重启后回落受限（50% / 15000mA）。</view>
+    </view>
+  </block>
+
+  <!-- 日志 -->
   <view class="section">
     <view class="section-title">日志</view>
     <view class="log">

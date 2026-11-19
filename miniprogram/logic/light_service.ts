@@ -163,6 +163,8 @@ export function encodeEffectPayload(params: EffectParams): Uint8Array {
       const from = toRgb(params.from, "from");
       const to = toRgb(params.to, "to");
       assertU16(params.periodMs, "periodMs");
+      // canonical 渐变参数长度 = 10（golden vectors / 固件）：9 个字段 + 末尾 1 保留字节。
+      // direction 在 params[8]，params[9] 为保留位（固件忽略）。
       return new Uint8Array([
         effectId,
         ...encodeColor(from),
@@ -170,6 +172,7 @@ export function encodeEffectPayload(params: EffectParams): Uint8Array {
         params.periodMs & 0xff,
         (params.periodMs >> 8) & 0xff,
         encodeDirection(params.direction, "direction"),
+        0x00,
       ]);
     }
     case "rainbow":
@@ -346,7 +349,11 @@ export class LightService {
     await this.writeAndWaitAck(frame, seq);
   }
 
-  /** 查询状态：GET_STATUS → 等 C3 回 STATUS；返回解析后的快照。 */
+  /**
+   * 查询状态：GET_STATUS → 等 C3 回 STATUS；返回解析后的快照。
+   * 先挂 STATUS 等待再写：C3 可能在 write 完成后极快回 STATUS（同步设备模型 / 真机
+   * 低延迟），等待者必须先就位，否则会丢帧。写失败则清理等待者并抛出原始错误。
+   */
   async requestStatus(): Promise<LightStatus> {
     if (this.link.state !== "ready") {
       throw new InvalidStateError(`当前状态 ${this.link.state} 不可查询状态`);
@@ -361,15 +368,68 @@ export class LightService {
       stripMask: 0,
       payload: new Uint8Array(0),
     });
-    // 先写；写失败直接抛（不创建等待者，避免悬挂 Promise）。
-    await this.link.write(frame);
-    return new Promise<LightStatus>((resolve, reject) => {
+    const statusPromise = new Promise<LightStatus>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.statusWaiter = undefined;
         reject(new TimeoutError("STATUS", this.ackTimeoutMs));
       }, this.ackTimeoutMs);
       this.statusWaiter = { resolve, reject, timer };
     });
+    try {
+      await this.link.write(frame);
+    } catch (error) {
+      const waiter = this.statusWaiter;
+      this.statusWaiter = undefined;
+      if (waiter?.timer !== undefined) clearTimeout(waiter.timer);
+      waiter?.reject(error);
+      await statusPromise.catch(() => undefined);
+      throw error;
+    }
+    return statusPromise;
+  }
+
+  /**
+   * 设置全局亮度（SET_BRIGHTNESS，#4 §2）：payload = brightness(1)，strip_mask 必须 0xFF。
+   * flags bit0=1 请求 ACK。超 50%（>127）且未解锁时 C3 回 NAK 0x06，此处原样 reject
+   * ServiceNakError(nakCode=0x06)，由上层（页面 / business_service）决定提示。
+   */
+  async setBrightness(brightness: number): Promise<void> {
+    assertByte(brightness, "brightness");
+    await this.sendGlobalCommand(FRAME_TYPES.setBrightness, new Uint8Array([brightness]));
+  }
+
+  /**
+   * 设置全局限流（SET_POWER_LIMIT，#4 §2）：payload = power_limit_ma(2) 小端，
+   * strip_mask 必须 0xFF。超过 15000mA 且未解锁时 C3 回 NAK 0x06；超过 30000mA（硬件
+   * 上限）回 NAK 0x05。原样 reject ServiceNakError。
+   */
+  async setPowerLimit(powerLimitMa: number): Promise<void> {
+    assertU16(powerLimitMa, "powerLimitMa");
+    const payload = new Uint8Array([powerLimitMa & 0xff, (powerLimitMa >> 8) & 0xff]);
+    await this.sendGlobalCommand(FRAME_TYPES.setPowerLimit, payload);
+  }
+
+  /**
+   * 满功率解锁（UNLOCK_FULL_POWER，#4 §2/§4）：payload = unlock(1) 0/1，strip_mask 必须 0xFF。
+   * =1 解锁（不持久化，C3 重启后回落受限）；=0 立即夹回 50% / 15000mA。
+   */
+  async unlockFullPower(unlock: boolean): Promise<void> {
+    await this.sendGlobalCommand(FRAME_TYPES.unlockFullPower, new Uint8Array([unlock ? 1 : 0]));
+  }
+
+  /** 全局命令（SET_BRIGHTNESS / SET_POWER_LIMIT / UNLOCK）统一编码：strip_mask 固定 0xFF、flags bit0=1。 */
+  private async sendGlobalCommand(type: number, payload: Uint8Array): Promise<void> {
+    const seq = this.nextSeq;
+    this.nextSeq = (this.nextSeq + 1) & 0xffff;
+    const frame = encode({
+      version: PROTOCOL_VERSION,
+      seq,
+      type,
+      flags: 0x01,
+      stripMask: 0xff,
+      payload,
+    });
+    await this.writeAndWaitAck(frame, seq);
   }
 
   private statusWaiter: { resolve: (status: LightStatus) => void; reject: (error: unknown) => void; timer: ReturnType<typeof setTimeout> | undefined } | undefined;

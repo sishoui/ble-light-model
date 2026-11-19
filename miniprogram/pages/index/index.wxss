@@ -1,4 +1,4 @@
-/* 首页样式（tracer bullet，简洁可用即可；#17 做完整 UI）。 */
+/* 完整控制 UI 样式（工单 #17）。 */
 page {
   background: #16213e;
   color: #e8e8e8;
@@ -36,6 +36,19 @@ page {
 .state--fault,
 .state--reconnecting {
   background: #a83232;
+}
+
+.banner {
+  border-radius: 12rpx;
+  padding: 16rpx 20rpx;
+  margin-bottom: 20rpx;
+  font-size: 26rpx;
+  text-align: center;
+}
+
+.banner--warn {
+  background: #5a3a12;
+  color: #ffcc66;
 }
 
 .section {
@@ -79,6 +92,11 @@ page {
 
 .btn--small {
   font-size: 24rpx;
+  padding: 0 24rpx;
+}
+
+.btn--tiny {
+  font-size: 22rpx;
   padding: 0 20rpx;
 }
 
@@ -124,6 +142,79 @@ page {
   margin-bottom: 8rpx;
 }
 
+.warn-inline {
+  font-size: 22rpx;
+  color: #ffcc66;
+  padding: 8rpx 0;
+}
+
+/* STATUS 网格 */
+.status-grid {
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: 8rpx;
+}
+
+.status-cell {
+  width: 50%;
+  display: flex;
+  justify-content: space-between;
+  padding: 8rpx 12rpx;
+  box-sizing: border-box;
+  font-size: 24rpx;
+}
+
+.status-cell .k {
+  color: #8a94b0;
+}
+
+.status-cell .v {
+  color: #e8e8e8;
+}
+
+.status-active {
+  font-size: 22rpx;
+  color: #b8c0d8;
+  margin-top: 12rpx;
+  padding-top: 12rpx;
+  border-top: 1rpx solid #33406a;
+  word-break: break-all;
+}
+
+/* strip_mask 灯路选择 */
+.mask {
+  font-size: 24rpx;
+  color: #4a90d9;
+}
+
+.lanes {
+  display: flex;
+  gap: 10rpx;
+  margin: 12rpx 0;
+}
+
+.lane {
+  width: 64rpx;
+  height: 64rpx;
+  line-height: 64rpx;
+  text-align: center;
+  border-radius: 12rpx;
+  background: #27335a;
+  font-size: 24rpx;
+  color: #8a94b0;
+}
+
+.lane--on {
+  background: #4a90d9;
+  color: #fff;
+}
+
+.lane-actions {
+  justify-content: flex-start;
+  gap: 16rpx;
+}
+
+/* 灯效网格 */
 .effect-grid {
   display: flex;
   flex-wrap: wrap;
@@ -143,8 +234,21 @@ page {
   color: #fff;
 }
 
+/* 滑条 */
 .sliders {
   margin: 16rpx 0;
+}
+
+.sliders-sub {
+  margin-top: 12rpx;
+  padding-top: 12rpx;
+  border-top: 1rpx solid #33406a;
+}
+
+.sub-title {
+  font-size: 22rpx;
+  color: #8a94b0;
+  margin-bottom: 8rpx;
 }
 
 .slider-row {
@@ -154,26 +258,47 @@ page {
 }
 
 .slider-row text {
-  width: 56rpx;
+  width: 96rpx;
   font-size: 24rpx;
   color: #b8c0d8;
+}
+
+.slider-row .param-label {
+  width: 120rpx;
 }
 
 .slider-row slider {
   flex: 1;
 }
 
-.sliders-sub {
-  margin-top: 12rpx;
-  padding-top: 12rpx;
-  border-top: 1rpx solid #33406a;
+.slider-val {
+  width: 96rpx;
+  text-align: right;
+  font-size: 24rpx;
+  color: #e8e8e8;
+}
+
+.limit-row {
+  margin-top: 20rpx;
+}
+
+.unlock-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 20rpx 0 8rpx;
+}
+
+.unlock-row .param-label {
+  font-size: 26rpx;
+  color: #b8c0d8;
 }
 
 .log {
   font-family: "SF Mono", "Menlo", monospace;
   font-size: 22rpx;
   color: #8a94b0;
-  max-height: 320rpx;
+  max-height: 360rpx;
   overflow-y: auto;
 }
 
