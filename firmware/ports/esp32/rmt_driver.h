@@ -40,6 +40,10 @@ esp_err_t rmt_transmit_strip(uint8_t channel);
  * （上层记 glitch）。 */
 esp_err_t rmt_wait_round(void);
 
+/* ISR 记录的 done num_symbols 排空与打印（led_task 轮次间隙调用，用于
+ * 诊断 num_symbols 与期望的差异；不会误报正常传输）。 */
+void rmt_dump_done(uint8_t ch_idx);
+
 #ifdef __cplusplus
 }
 #endif

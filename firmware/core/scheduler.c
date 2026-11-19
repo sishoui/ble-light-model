@@ -77,7 +77,7 @@ uint8_t sched_tick(sched_ctx_t *ctx)
         sched_item_t item;
         item.strip = strip;
         item.sym = NULL;
-        item.sym_count = SCHED_EXPECTED_SYMBOLS;
+        item.sym_count = SCHED_BUF_SYMBOLS;
         ctx->transmit(ch, &item, ctx->transmit_ctx);
         ctx->last_sent_ms[strip] = now;
         ctx->ever_sent |= (uint8_t)(1u << strip);

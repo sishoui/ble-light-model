@@ -59,12 +59,14 @@ typedef struct {
     rmt_encoder_handle_t enc;
     rmt_transmit_config_t tx_cfg;
     sched_ctx_t *sched; /* glitch 回加上报目标（可为 NULL） */
+    uint8_t ch_idx[2];  /* user_ctx：回调内识别通道号（内部 RAM） */
+    volatile uint32_t done_num[2]; /* done 回调记录 num_symbols（ISR 写、任务读） */
 } rmt_ctx_t;
 
 static rmt_ctx_t R;
 
 /* core 符号缓冲：每通道每轮一条（1441 符号），静态分配无堆。 */
-static ws2812_symbol_t sym_buf[2][SCHED_EXPECTED_SYMBOLS];
+static ws2812_symbol_t sym_buf[2][SCHED_BUF_SYMBOLS];
 
 /*
  * 回调式编码器（IDF v5.5 官方 rmt_new_simple_encoder）：payload 是
@@ -99,13 +101,31 @@ static bool IRAM_ATTR on_trans_done(rmt_channel_handle_t ch,
                                     const rmt_tx_done_event_data_t *edata,
                                     void *user_ctx)
 {
-    /* num_symbols 含驱动追加的 1 个 EOF；期望 = 数据符号 + 1。 */
+    uint8_t ch_idx = *(uint8_t *)user_ctx;
+    uint32_t num = edata->num_symbols;
+
     if (R.sched != NULL) {
-        sched_note_done(R.sched, edata->num_symbols);
+        sched_note_done(R.sched, num);
     }
-    (void)ch;
-    (void)user_ctx;
+    /* 只在 ISR 里记录 num_symbols（不可打印/加锁），
+     * 由 led_task 轮次间隙排空并打印。 */
+    R.done_num[ch_idx] = num;
     return false;
+}
+
+/* led_task 轮次间隙读取并打印（清零）。仅当 num_symbols 与期望不符
+ * 时打印（诊断 glitch 用）；正常传输静默。 */
+void rmt_dump_done(uint8_t ch_idx)
+{
+    if (ch_idx >= 2) {
+        return;
+    }
+    uint32_t num = R.done_num[ch_idx];
+    R.done_num[ch_idx] = 0;
+    if (num != 0u && num != SCHED_EXPECTED_SYMBOLS) {
+        ESP_LOGW(TAG, "ch%u done num_symbols=%u (expect %u)",
+                 ch_idx, num, SCHED_EXPECTED_SYMBOLS);
+    }
 }
 
 esp_err_t rmt_driver_init(sched_ctx_t *sched)
@@ -121,6 +141,7 @@ esp_err_t rmt_driver_init(sched_ctx_t *sched)
         .resolution_hz = 80u * 1000u * 1000u, /* 1 tick = 12.5ns */
         .mem_block_symbols = 48,              /* 双通道对称 48+48，见文件头 */
         .intr_priority = 3,                   /* LOWMED 档最高，创建后不可改 */
+        .trans_queue_depth = 2,               /* 每通道 2 个待发事务，配合 tx_wait_all_done */
         .flags.with_dma = false,
         .flags.io_loop_back = false,
         .flags.io_od_mode = false,
@@ -154,7 +175,8 @@ esp_err_t rmt_driver_init(sched_ctx_t *sched)
         .on_trans_done = on_trans_done,
     };
     for (int i = 0; i < 2; i++) {
-        err = rmt_tx_register_event_callbacks(R.ch[i], &cbs, NULL);
+        R.ch_idx[i] = (uint8_t)i;
+        err = rmt_tx_register_event_callbacks(R.ch[i], &cbs, &R.ch_idx[i]);
         if (err != ESP_OK) {
             ESP_LOGE(TAG, "ch%d cbs failed: %s", i, esp_err_to_name(err));
             return err;
@@ -186,7 +208,9 @@ ws2812_symbol_t *rmt_strip_symbols(uint8_t strip)
     if (strip >= SCHED_STRIP_COUNT) {
         return NULL;
     }
-    return sym_buf[strip / 2u];
+    /* 通道 = strip % 2（与 rmt_strip_gpio / sched_round_strip 一致：
+     * 偶数灯带走 ch0、奇数走 ch1）。sym_buf 每通道一个。 */
+    return sym_buf[strip % 2u];
 }
 
 esp_err_t rmt_transmit_strip(uint8_t channel)
@@ -194,20 +218,30 @@ esp_err_t rmt_transmit_strip(uint8_t channel)
     if (channel >= 2) {
         return ESP_ERR_INVALID_ARG;
     }
-    /* payload = 符号数组按字节（sym_count × 4）；回调按符号拷贝。 */
-    return rmt_transmit(R.ch[channel], R.enc, sym_buf[channel],
-                        SCHED_EXPECTED_SYMBOLS *
-                            sizeof(sym_buf[channel][0]),
-                        &R.tx_cfg);
+    /* payload = 符号数组按字节（sym_count × 4）；回调按符号拷贝。
+     * 发全部缓冲（含 1 个 EOF 占位符，线上 1.25µs 低电平，无碍）。 */
+    esp_err_t err = rmt_transmit(R.ch[channel], R.enc, sym_buf[channel],
+                                 SCHED_BUF_SYMBOLS *
+                                     sizeof(sym_buf[channel][0]),
+                                 &R.tx_cfg);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "ch%u transmit err 0x%x", channel, (unsigned)err);
+    }
+    return err;
 }
 
 esp_err_t rmt_wait_round(void)
 {
-    /* 两通道串行等待（#7 §6）。1.8ms/条，20ms 超时裕量充足；
+    /* 两通道串行等待（#7 §6）。1.8ms/条，50ms 超时裕量充足；
      * ESP_ERR_TIMEOUT 即 glitch（done 未到，note_done 不会补计）。 */
-    esp_err_t e0 = rmt_tx_wait_all_done(R.ch[0], 20);
-    esp_err_t e1 = rmt_tx_wait_all_done(R.ch[1], 20);
-    if (e0 == ESP_ERR_TIMEOUT || e1 == ESP_ERR_TIMEOUT) {
+    esp_err_t e0 = rmt_tx_wait_all_done(R.ch[0], 50);
+    esp_err_t e1 = rmt_tx_wait_all_done(R.ch[1], 50);
+    if (e0 == ESP_ERR_TIMEOUT) {
+        ESP_LOGW(TAG, "round wait ch0 timeout");
+        return ESP_ERR_TIMEOUT;
+    }
+    if (e1 == ESP_ERR_TIMEOUT) {
+        ESP_LOGW(TAG, "round wait ch1 timeout");
         return ESP_ERR_TIMEOUT;
     }
     return ESP_OK;

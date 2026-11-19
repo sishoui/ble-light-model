@@ -227,6 +227,19 @@ esp_err_t app_init(void)
         ESP_LOGE(TAG, "nimble gatt init failed 0x%x", (unsigned)err);
     }
 
+    /* USB CDC 控制台：先装驱动再建任务（console_task 立即读写，
+     * 未装驱动会空指针 panic）。 */
+    usb_serial_jtag_driver_config_t usb_cfg = {
+        .tx_buffer_size = 512,
+        .rx_buffer_size = 512,
+    };
+    err = usb_serial_jtag_driver_install(&usb_cfg);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "usb_serial_jtag driver install failed 0x%x",
+                 (unsigned)err);
+        return err;
+    }
+
     BaseType_t ok = xTaskCreate(console_task, "console", 3072, NULL, 3, NULL);
     if (ok != pdPASS) {
         return ESP_FAIL;

@@ -41,8 +41,11 @@ extern "C" {
 #define SCHED_CHANNELS 2u
 #define SCHED_ROUNDS 4u
 #define SCHED_SYMBOLS_PER_STRIP (60u * 24u)
-/* done 回调期望值：数据符号 + 1 个 EOF。 */
-#define SCHED_EXPECTED_SYMBOLS (SCHED_SYMBOLS_PER_STRIP + 1u)
+/* 缓冲容量：ws2812_encode 写入 1440 数据符号 + 1 个 EOF 占位。 */
+#define SCHED_BUF_SYMBOLS (SCHED_SYMBOLS_PER_STRIP + 1u)
+/* done 回调期望值：num_symbols = 应用符号数 + 驱动追加 1 EOF，
+ * 期望 = 1441 + 1。 */
+#define SCHED_EXPECTED_SYMBOLS (SCHED_BUF_SYMBOLS + 1u)
 
 /* 每轮两条的发送请求（transmit 回调的入参）。 */
 typedef struct {

@@ -90,7 +90,7 @@ static void on_transmit(uint8_t channel, const sched_item_t *item, void *ctx)
 }
 
 /* 渲染一轮 2 条灯带的符号缓冲（读共享快照）。 */
-static void render_round(uint8_t round)
+static void render_round(uint8_t round, uint32_t now)
 {
     led_shared_t snap;
     uint8_t frame[EFFECT_LEDS_PER_STRIP * 3];
@@ -103,9 +103,9 @@ static void render_round(uint8_t round)
         uint8_t strip = sched_round_strip(round, ch);
         ws2812_symbol_t *dst = rmt_strip_symbols(strip);
 
-        effect_render(&snap.effects, strip, now_ms(NULL), frame);
+        effect_render(&snap.effects, strip, now, frame);
         ws2812_encode(frame, EFFECT_LEDS_PER_STRIP, snap.brightness, dst,
-                      SCHED_EXPECTED_SYMBOLS);
+                      SCHED_BUF_SYMBOLS);
     }
 }
 
@@ -119,7 +119,7 @@ static void led_task(void *arg)
     for (;;) {
         /* 到刷新周期点：跑一轮（round = sched 当前轮号）。 */
         uint8_t round = sched.round;
-        render_round(round);
+        render_round(round, now_ms(NULL));
         rmt_switch_select_round(round);
         sched_tick(&sched); /* 内部经 on_transmit 启动两通道 */
         if (rmt_wait_round() != ESP_OK) {
@@ -128,6 +128,8 @@ static void led_task(void *arg)
             ESP_LOGW(TAG, "round timeout (glitch, count=%u)",
                      (unsigned)sched.glitch_count);
         }
+        rmt_dump_done(0);
+        rmt_dump_done(1);
         /* 传输窗口结束：轮次间隙（日志/堆操作可在此做）。 */
         rmt_switch_all_off();
         /* #15：glitch 累计值变化事件（PC 集成断言锚点，事件级去重：
