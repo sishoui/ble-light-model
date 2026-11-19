@@ -7,6 +7,7 @@
 - `miniprogram/`：小程序工程。`logic/` 是纯 TS(ESM) 逻辑层，禁止引用 `wx` / `Page` / `Component` / `getApp`（`docs/spec/test-strategy.md` §1.1）。
 - `firmware/`：PlatformIO 工程（ESP-IDF v5.5.3）。`proto/` 是纯 C99 协议层；`test/` 是 Unity host 单测。
 - `tests/protocol/`：JS / C / Python 三侧共用的 golden 向量契约。
+- `tests/scenarios/`：语言无关 BLE 场景脚本（§3.6），FakeTransport / PC harness / 真机 B 共读。
 - `tests/pc_integration/`：PC 蓝牙 + COM6 集成测试（依赖硬件，不进 CI）。
 - `docs/spec/test-strategy.md`：测试体系 spec（单一事实源）。
 
