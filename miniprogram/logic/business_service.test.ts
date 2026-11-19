@@ -23,6 +23,7 @@ import {
 } from "./business_service";
 import { FakeTransport } from "./test_utils/fake_transport";
 import { FakeLightDevice } from "./test_utils/fake_device";
+import type { FakeLightDeviceOptions } from "./test_utils/fake_device";
 import { LightService } from "./light_service";
 
 interface SetupOptions {
@@ -180,6 +181,35 @@ describe("LightBusinessService 解锁不持久化", () => {
     await connect(service);
     service.onHide();
     await expect(service.onShow()).resolves.toBeUndefined();
+  });
+});
+
+describe("FakeLightDevice.reboot 受限夹取（#4 §4）", () => {
+  function makeDevice(options: FakeLightDeviceOptions = {}): FakeLightDevice {
+    const transport = new FakeTransport();
+    return new FakeLightDevice(transport, options);
+  }
+
+  it("重启后亮度夹到 127、限流夹到 15000，解锁清除", () => {
+    const device = makeDevice({ brightness: 200, powerLimitMa: 30000, unlocked: true });
+    device.reboot();
+    expect(device.brightness).toBe(127); // min(200, 127)
+    expect(device.powerLimitMa).toBe(15000); // min(30000, 15000)
+    expect(device.unlocked).toBe(false);
+  });
+
+  it("重启后未超限的亮度/限流原样保留", () => {
+    const device = makeDevice({ brightness: 100, powerLimitMa: 10000 });
+    device.reboot();
+    expect(device.brightness).toBe(100);
+    expect(device.powerLimitMa).toBe(10000);
+  });
+
+  it("重启后保存的灯效恢复（继续跑）", () => {
+    const device = makeDevice();
+    device.activeEffect[0] = 1;
+    device.reboot();
+    expect(device.activeEffect[0]).toBe(1);
   });
 });
 

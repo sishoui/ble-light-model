@@ -130,6 +130,14 @@ void gatt_build_status(uint8_t out[GATT_STATUS_PAYLOAD_LEN],
 /* 是否要回 ACK：flags bit0（协议第 1 节）。 */
 uint8_t gatt_action_wants_ack(const ble_proto_frame_t *f);
 
+/*
+ * 重启 / 受限恢复夹取（#4 §4：重启后先限 50% / 15000mA，解锁态不持久化）：
+ * 亮度夹到 <= GATT_BRIGHTNESS_LIMIT（127），限流夹到 <= GATT_POWER_LIMIT_MA
+ * （15000）。in/out 指针，就地修改；core 纯函数（host 可测），ports 的
+ * nvs_store 恢复路径直接调用。
+ */
+void gatt_clamp_restricted(uint8_t *brightness, uint16_t *power_limit_ma);
+
 #ifdef __cplusplus
 }
 #endif

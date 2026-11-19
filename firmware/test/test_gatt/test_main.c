@@ -343,6 +343,39 @@ static void test_hello_layout(void)
     }
 }
 
+/* ---------- 受限恢复夹取（#4 §4：重启后先限 50% / 15000mA） ---------- */
+
+static void test_clamp_restricted_clamps_over_limit(void)
+{
+    uint8_t brightness = 200;
+    uint16_t limit = 30000;
+
+    gatt_clamp_restricted(&brightness, &limit);
+    TEST_ASSERT_EQUAL_UINT8(127, brightness);
+    TEST_ASSERT_EQUAL_UINT16(15000, limit);
+}
+
+static void test_clamp_restricted_keeps_within_limit(void)
+{
+    uint8_t brightness = 127;
+    uint16_t limit = 15000;
+
+    gatt_clamp_restricted(&brightness, &limit);
+    TEST_ASSERT_EQUAL_UINT8(127, brightness);
+    TEST_ASSERT_EQUAL_UINT16(15000, limit);
+}
+
+static void test_clamp_restricted_boundary(void)
+{
+    /* 128 刚超限 -> 夹到 127；15001 刚超限 -> 夹到 15000。 */
+    uint8_t brightness = 128;
+    uint16_t limit = 15001;
+
+    gatt_clamp_restricted(&brightness, &limit);
+    TEST_ASSERT_EQUAL_UINT8(127, brightness);
+    TEST_ASSERT_EQUAL_UINT16(15000, limit);
+}
+
 /* ---------- STATUS 字节级 ---------- */
 
 static void test_status_layout(void)
@@ -463,6 +496,9 @@ int main(void)
     RUN_TEST(test_dispatch_server_types_nak02);
     RUN_TEST(test_dispatch_cap_zero_writes_nothing);
     RUN_TEST(test_hello_layout);
+    RUN_TEST(test_clamp_restricted_clamps_over_limit);
+    RUN_TEST(test_clamp_restricted_keeps_within_limit);
+    RUN_TEST(test_clamp_restricted_boundary);
     RUN_TEST(test_status_layout);
     RUN_TEST(test_ack_frame_bytes);
     RUN_TEST(test_nak_frame_bytes);

@@ -149,12 +149,15 @@ export class FakeLightDevice {
     return { deviceId: this.deviceId, name: "BLELight-C3", RSSI: -50 };
   }
 
-  /** 模拟断电重启：恢复受限态默认（亮度 128 / 限流 15000 / 解锁清除 / 灯效全灭）。 */
+  /**
+   * 模拟断电重启（#4 §4）：恢复保存的 scene，但先限 50%（亮度
+   * min(saved,127)）/ 15000mA（限流 min(saved,15000)）；解锁态不恢复。
+   * 灯效作为保存的 scene 恢复、继续跑（与固件 nvs_store 恢复口径一致）。
+   */
   reboot(): void {
-    this.brightness = 128;
-    this.powerLimitMa = POWER_LIMIT_MA;
+    this.brightness = Math.min(this.brightness, BRIGHTNESS_LIMIT);
+    this.powerLimitMa = Math.min(this.powerLimitMa, POWER_LIMIT_MA);
     this.unlocked = false;
-    this.activeEffect.fill(0xff);
   }
 
   /** 主动推一条 STATUS（模拟周期 notify 或 GET_STATUS 响应）。 */

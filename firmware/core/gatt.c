@@ -111,6 +111,17 @@ uint8_t gatt_action_wants_ack(const ble_proto_frame_t *f)
     return want_ack(f);
 }
 
+/* 重启 / 受限恢复夹取（#4 §4）：亮度 <=127、限流 <=15000mA。 */
+void gatt_clamp_restricted(uint8_t *brightness, uint16_t *power_limit_ma)
+{
+    if (brightness != NULL && *brightness > GATT_BRIGHTNESS_LIMIT) {
+        *brightness = (uint8_t)GATT_BRIGHTNESS_LIMIT;
+    }
+    if (power_limit_ma != NULL && *power_limit_ma > GATT_POWER_LIMIT_MA) {
+        *power_limit_ma = GATT_POWER_LIMIT_MA;
+    }
+}
+
 static void put_nak(gatt_action_t *a, uint16_t seq, uint8_t code)
 {
     a->type = GATT_ACT_NAK;

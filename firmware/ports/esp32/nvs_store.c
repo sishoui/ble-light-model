@@ -74,14 +74,14 @@ int nvs_store_load(scene_state_t *out, esp_err_t *err)
         return 0;
     }
     if (scene_decode(blob, len, out)) {
-        /* 持久化的限流：恢复（受限默认或保存值）；解锁态不恢复。 */
+        /* #4 §4：重启后先限 50%（亮度 127）/ 15000mA；解锁态不恢复。
+         * 夹取走 core 纯函数 gatt_clamp_restricted（host 可测），ports 只调用。 */
         s_power_limit = out->power_limit_ma;
-        if (s_power_limit > GATT_POWER_LIMIT_MA) {
-            s_power_limit = GATT_POWER_LIMIT_MA;
-            out->power_limit_ma = s_power_limit;
-        }
-        ESP_LOGI(TAG, "scene restored (len=%u, limit=%uma)",
-                 (unsigned)len, (unsigned)s_power_limit);
+        gatt_clamp_restricted(&out->brightness, &s_power_limit);
+        out->power_limit_ma = s_power_limit;
+        ESP_LOGI(TAG, "scene restored (len=%u, brightness=%u, limit=%uma)",
+                 (unsigned)len, (unsigned)out->brightness,
+                 (unsigned)s_power_limit);
         return 1;
     }
     ESP_LOGW(TAG, "scene invalid -> all off");
