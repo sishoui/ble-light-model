@@ -1,18 +1,21 @@
 /*
- * 上电自检与串口测试指令（app 层）。
+ * 上电装配与串口测试指令（app 层）。
+ *
+ * 装配（#14 起）：
+ *   1. led_task_start（RMT 双通道 + LED 任务）
+ *   2. nvs_store_init + nvs_store_load → 恢复 last scene 到 led 共享状态
+ *      （缺失/损坏 -> 全灭态；解锁态不恢复，重启受限）
+ *   3. nimble_gatt_init（NimBLE GATT server + 广播 + 周期定时器）
+ *   4. USB CDC 控制台 + 上电自检
+ *
+ * 协议分发（SET_EFFECT / SET_BRIGHTNESS / SET_POWER_LIMIT /
+ * UNLOCK_FULL_POWER / GET_STATUS）在 ports/esp32/nimble_gatt.c 的
+ * on_frame 执行，与 BLE 共享同一 core/gatt.c 分发层。USB CDC 控制台是
+ * 测试辅助（不进协议 profile），保持自有简单解析（console.c），但它也
+ * 通过 led_task_set_shared 落共享状态 —— 与 BLE 共用同一渲染数据面。
  *
  * 自检：上电后跑一段可辨识序列 —— 8 条灯带按 L0→L7 顺序轮流点亮
- * 各自一遍（每条一个不同颜色），然后结束恢复原共享状态。自检借用灯带
- * 的方式是改共享状态（读改写），由 LED 任务按调度自然渲染 —— 不碰
- * RMT 硬件、不加第二事实源。
- *
- * 串口测试指令：C3 原生 USB CDC（SuperMini 同款）。行式，core/console.c
- * 解析（纯函数 host 单测），app 只执行动作：
- *   SET <mask> <effect_id> [params...]  例：SET ff 01 ff 00 00（全带红静态）
- *   BRI <0-255>                          全局亮度
- *   SELFTEST                             触发自检序列
- *   ?                                    帮助
- * 每行回 OK / ERR / 事件行（SELFTEST / ready）。
+ * 各自一遍（每条一个不同颜色），然后结束恢复原共享状态。
  */
 
 #include "app.h"
@@ -28,6 +31,9 @@
 #include "console.h"
 #include "effect_engine.h"
 #include "led_task.h"
+#include "nimble_gatt.h"
+#include "nvs_store.h"
+#include "scene.h"
 
 static const char *TAG = "app";
 
@@ -86,6 +92,7 @@ static uint8_t console_set_effect(uint8_t mask, uint8_t effect_id,
                      (uint32_t)(esp_timer_get_time() / 1000));
     if (r == EFFECT_OK) {
         led_task_set_shared(&st);
+        nvs_store_mark_dirty();
     }
     return r;
 }
@@ -97,6 +104,7 @@ static void console_set_brightness(uint8_t b)
     led_task_snapshot(&st);
     st.brightness = b;
     led_task_set_shared(&st);
+    nvs_store_mark_dirty();
 }
 
 /* ---- USB CDC 字符收发 ---- */
@@ -177,6 +185,28 @@ esp_err_t app_init(void)
     err = led_task_start();
     if (err != ESP_OK) {
         return err;
+    }
+
+    /* #14：NVS 场景恢复（缺失/损坏 -> 全灭；解锁态不恢复）。 */
+    err = nvs_store_init();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "nvs init failed 0x%x (continuing without persistence)",
+                 (unsigned)err);
+    } else {
+        scene_state_t scene;
+        if (nvs_store_load(&scene, NULL)) {
+            led_shared_t st;
+            st.effects = scene.effects;
+            st.brightness = scene.brightness;
+            led_task_set_shared(&st);
+            ESP_LOGI(TAG, "last scene restored");
+        }
+    }
+
+    /* #14：BLE GATT server。 */
+    err = nimble_gatt_init();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "nimble gatt init failed 0x%x", (unsigned)err);
     }
 
     BaseType_t ok = xTaskCreate(console_task, "console", 3072, NULL, 3, NULL);

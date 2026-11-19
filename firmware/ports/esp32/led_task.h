@@ -42,6 +42,9 @@ esp_err_t led_task_start(void);
 void led_task_set_shared(const led_shared_t *shared);
 void led_task_snapshot(led_shared_t *out);
 
+/* glitch 计数（scheduler 持有，NimBLE 侧 STATUS 上报用）。 */
+uint16_t led_task_glitch_count(void);
+
 #ifdef __cplusplus
 }
 #endif

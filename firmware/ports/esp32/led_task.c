@@ -62,6 +62,11 @@ void led_task_snapshot(led_shared_t *out)
     portEXIT_CRITICAL(&shared_mux);
 }
 
+uint16_t led_task_glitch_count(void)
+{
+    return sched.glitch_count;
+}
+
 static uint32_t now_ms(void *ctx)
 {
     (void)ctx;

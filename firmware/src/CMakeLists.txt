@@ -3,6 +3,8 @@ idf_component_register(
          "../ports/esp32/rmt_driver.c"
          "../ports/esp32/rmt_switch.c"
          "../ports/esp32/led_task.c"
+         "../ports/esp32/nvs_store.c"
+         "../ports/esp32/nimble_gatt.c"
          "../app/app.c"
     INCLUDE_DIRS
         "."
@@ -15,4 +17,6 @@ idf_component_register(
         "esp_timer"
         "esp_driver_rmt"
         "usb"
+        "nvs_flash"
+        "bt"
 )
