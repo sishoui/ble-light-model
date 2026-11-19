@@ -146,6 +146,26 @@ static void test_feed_reset(void)
     TEST_ASSERT_EQUAL_UINT32(0, ctx.len);
 }
 
+/* ---------- 半帧 200ms 超时丢弃（#4 §1） ---------- */
+
+static void test_feed_should_reset_boundary(void)
+{
+    /* 199ms 未到：不丢弃。 */
+    TEST_ASSERT_EQUAL_INT(0, ble_proto_feed_should_reset(1000u, 1199u));
+    /* 200ms 整：丢弃（>= 200）。 */
+    TEST_ASSERT_EQUAL_INT(1, ble_proto_feed_should_reset(1000u, 1200u));
+    /* 201ms：丢弃。 */
+    TEST_ASSERT_EQUAL_INT(1, ble_proto_feed_should_reset(1000u, 1201u));
+}
+
+static void test_feed_should_reset_wrap_safe(void)
+{
+    /* uint32 回绕：last 接近上限，now 已回绕，差值仍按模 2^32 计算。 */
+    TEST_ASSERT_EQUAL_INT(0, ble_proto_feed_should_reset(0xFFFFFFF0u, 0x00000010u)); /* 32ms */
+    TEST_ASSERT_EQUAL_INT(1, ble_proto_feed_should_reset(0xFFFFFFF0u, 0x000000C8u)); /* 200ms */
+    TEST_ASSERT_EQUAL_INT(1, ble_proto_feed_should_reset(0xFFFFFFF0u, 0x000000C9u)); /* 201ms */
+}
+
 /* ---------- golden 向量 ---------- */
 
 static vec_doc_t doc;
@@ -308,6 +328,8 @@ int main(void)
     RUN_TEST(test_roundtrip_max_payload);
     RUN_TEST(test_feed_caps_discard_extra_frames);
     RUN_TEST(test_feed_reset);
+    RUN_TEST(test_feed_should_reset_boundary);
+    RUN_TEST(test_feed_should_reset_wrap_safe);
     RUN_TEST(test_vectors_encode);
     RUN_TEST(test_vectors_feed);
     return UNITY_END();

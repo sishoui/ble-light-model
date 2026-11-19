@@ -268,6 +268,12 @@ void ble_proto_feed_reset(ble_proto_feed_t *ctx)
     ctx->len = 0;
 }
 
+int ble_proto_feed_should_reset(uint32_t last_ms, uint32_t now_ms)
+{
+    /* 无符号回绕安全：now - last 在 uint32 上回绕后仍正确表示时间差。 */
+    return (int)((uint32_t)(now_ms - last_ms) >= BLE_PROTO_FEED_TIMEOUT_MS);
+}
+
 int ble_proto_effect_param_length(uint8_t effect_id)
 {
     static const int8_t lengths[7] = {0, 3, 7, 10, 3, 7, 5};

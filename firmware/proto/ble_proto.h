@@ -63,6 +63,16 @@ typedef struct {
     uint8_t type;
 } ble_proto_error_t;
 
+/* 接收端半帧超时（#4 §1：200ms 未完成则丢弃半帧；遇新 magic 也丢，在 feed 里处理）。 */
+#define BLE_PROTO_FEED_TIMEOUT_MS 200u
+
+/*
+ * 判断半帧是否已超时应被丢弃：now_ms - last_ms >= 200ms（#4 §1）。
+ * 纯函数：仅本地时钟比较，无 I/O、无动态内存、host 可单测；无副作用。
+ * last_ms 为半帧里最近一字节的收到时刻（若半帧为空则不应调用）。
+ */
+int ble_proto_feed_should_reset(uint32_t last_ms, uint32_t now_ms);
+
 /*
  * feed 重组上下文：调用方分配（静态或栈变量），必须零初始化
  * （ble_proto_feed_reset 可在连接重置时清空半帧）。
