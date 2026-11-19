@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "name": "pc_connect_write_status",
+  "description": "PC 集成 smoke 子集（spec §3.3/§3.6）：连接 + 写 SET_EFFECT(ACK) + GET_STATUS(STATUS 字段)。FakeTransport 与 PC harness 共读——FakeTransport 跑全部 steps（scan/connect/write/notify），PC harness 只读带 pc 标记的写步骤（pc.frame + pc.expect）。",
+  "environment": { "platform": "android", "mtu": 23 },
+  "steps": [
+    { "action": "scan", "timeoutMs": 40, "expect": { "devices": ["C3-A1"] } },
+    {
+      "action": "connect",
+      "deviceId": "C3-A1",
+      "script": {
+        "notifyHex": ["AA550100000100001D010100001D01010000083C3075983A4655077F0000000000000000000000000000005CF6"]
+      },
+      "expect": { "state": "ready" }
+    },
+    {
+      "action": "write",
+      "hex": "AA550101000201010401FF0000B521",
+      "expect": { "state": "ready", "chunks": [15] },
+      "pc": {
+        "frame": { "type": "setEffect", "flags": 1, "strip_mask": 1, "payloadHex": "01FF0000" },
+        "expect": "ack"
+      }
+    },
+    {
+      "action": "notify",
+      "frames": ["AA55010200070000020100E7E9"],
+      "expect": { "notifications": ["AA55010200070000020100E7E9"] }
+    },
+    {
+      "action": "write",
+      "hex": "AA550102000600000076E5",
+      "expect": { "state": "ready", "chunks": [11] },
+      "pc": {
+        "frame": { "type": "getStatus", "flags": 0, "strip_mask": 0, "payloadHex": "" },
+        "expect": "status",
+        "statusFields": { "active_effect": [1, 0, 0, 0, 0, 0, 0, 0] }
+      }
+    },
+    {
+      "action": "notify",
+      "frames": ["AA550103000900001800000000000000000000000080983A00010000000000000022F9"],
+      "expect": { "notifications": ["AA550103000900001800000000000000000000000080983A00010000000000000022F9"] }
+    }
+  ]
+}

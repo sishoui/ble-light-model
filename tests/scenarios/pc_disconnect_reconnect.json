@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "name": "pc_disconnect_reconnect",
+  "description": "PC 集成断连重连（spec §3.3/§3.6）：PC 断连 -> C3 重启广播 -> 重连 -> 订阅 -> HELLO -> 重连后 GET_STATUS。FakeTransport 跑全部 steps（connect/disconnect/waitForState/write/notify），PC harness 读 pc.reconnect 标记触发 reconnect() 并跑 pc 标记的写步骤。",
+  "steps": [
+    { "action": "connect", "deviceId": "C3-A1", "expect": { "state": "ready" } },
+    {
+      "action": "disconnect",
+      "trigger": "remote",
+      "expect": { "state": "reconnecting" },
+      "pc": { "reconnect": true }
+    },
+    { "action": "waitForState", "expect": { "state": "ready", "connectCalls": 2 } },
+    {
+      "action": "write",
+      "hex": "AA550102000600000076E5",
+      "expect": { "state": "ready", "chunks": [11] },
+      "pc": {
+        "frame": { "type": "getStatus", "flags": 0, "strip_mask": 0, "payloadHex": "" },
+        "expect": "status"
+      }
+    },
+    {
+      "action": "notify",
+      "frames": ["AA550103000900001800000000000000000000000080983A00010000000000000022F9"],
+      "expect": { "notifications": ["AA550103000900001800000000000000000000000080983A00010000000000000022F9"] }
+    }
+  ]
+}

@@ -9,7 +9,8 @@
 
 先决条件：PC 蓝牙适配器已开，C3 在广播（BLELight-C3），USB CDC COM 口可按
 VID=0x303A 发现（不硬编码 COM6）。单进程同开 BLE + COM6。
-步骤定义见 scenario.py（basic_scenario / smoke_scenario）。
+步骤定义见 `tests/scenarios/*.json`（schema v1，与 FakeTransport 共读，见
+`tests/scenarios/README.md` 共享矩阵），scenario.py 负责装载。
 """
 
 from __future__ import annotations
