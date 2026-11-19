@@ -1,2 +1,10 @@
 CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
 CONFIG_ESPTOOLPY_FLASHSIZE="4MB"
+
+# #13 RMT 缓解包（#7 §3）：
+# ① 编码函数进 IRAM（rmt_driver.c 的 txe_encode 等带 RMT_ENCODER_FUNC_ATTR）
+CONFIG_RMT_ENCODER_FUNC_IN_IRAM=y
+# ② RMT TX ISR cache-safe（BLE/WiFi cache 禁用期间补数据不挂）
+CONFIG_RMT_TX_ISR_CACHE_SAFE=y
+# ③ FreeRTOS tick 1kHz（LED 任务 25ms 周期的 delay 粒度）
+CONFIG_FREERTOS_HZ=1000

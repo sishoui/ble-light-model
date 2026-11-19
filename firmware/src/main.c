@@ -1,7 +1,11 @@
 #ifdef ESP_PLATFORM
+#include "app.h"
+
 void app_main(void)
 {
-    /* 骨架：后续工单在此初始化 BLE、协议层与 effect_engine。 */
+    /* #13：装配 LED 任务（RMT 双通道）+ USB CDC 测试指令 + 上电自检。
+     * BLE（#14）后续在此接入 led_task_set_shared。 */
+    app_init();
 }
 #elif !defined(PIO_UNIT_TESTING)
 int main(void)
