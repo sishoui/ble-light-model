@@ -1,5 +1,560 @@
 {
   "version": 1,
   "encoding": "hex",
-  "vectors": []
+  "generated_by": "tests/protocol/generate_vectors.mjs",
+  "description": "BLE Light Model 协议 v1 golden 向量：JS codec / C ble_proto（及后续 Python 复刻）共跑的唯一编解码契约。",
+  "frame": {
+    "magic": "AA55",
+    "layout": "AA55 | ver(1) | seq(2 LE) | type(1) | flags(1) | strip_mask(1) | param_len(1) | payload(N) | crc16(2 LE)",
+    "header_size": 9,
+    "max_payload": 255,
+    "max_frame_size": 266,
+    "endianness": "little",
+    "crc": "CRC-16/CCITT-FALSE：poly=0x1021 init=0xFFFF refin=false refout=false xorout=0x0000，覆盖 ver..payload",
+    "flags_ack": "bit0 = 需要 ACK；其余位保留，接收端忽略未知位，不 NAK"
+  },
+  "constants": {
+    "protocol_version": 1,
+    "types": {
+      "hello": 1,
+      "set_effect": 2,
+      "set_brightness": 3,
+      "set_power_limit": 4,
+      "unlock_full_power": 5,
+      "get_status": 6,
+      "ack": 7,
+      "nak": 8,
+      "status": 9
+    },
+    "nak_errors": {
+      "crc": 1,
+      "unknown_type": 2,
+      "unknown_effect": 3,
+      "length_mismatch": 4,
+      "invalid_param": 5,
+      "not_unlocked": 6,
+      "busy": 7,
+      "bad_version": 8
+    }
+  },
+  "effect_param_lengths": {
+    "0x00": 0,
+    "0x01": 3,
+    "0x02": 7,
+    "0x03": 10,
+    "0x04": 3,
+    "0x05": 7,
+    "0x06": 5
+  },
+  "feed_semantics": {
+    "writes": "每次写入的原始 BLE 字节（hex）。两侧测试统一：pending = 上一次的 remainder；每次 feed(concat(pending, write))，remainder 作为下一次的 pending。",
+    "expect_remainders": "与 writes 等长：每次喂入后未完成尾字节的 hex（空串 = 无未完成数据）。",
+    "resync": "半帧（不完整帧）后遇到新的 AA 55 magic 时丢弃半帧；CRC 错但帧内出现 AA 55 视为错位垃圾并静默重同步；孤立 0xAA / 非帧垃圾静默丢弃。",
+    "seq": "seq 错不是协议错误：帧仍可解码、不产生 ACK；ACK 匹配、超时重传由 BleLink 负责（#4 决议）。expect_ack_generated=false 表示 Codec 不得自行产生 ACK 帧。",
+    "param_len": "SET_EFFECT payload = effect_id(1) + 效果参数；effect_param_lengths 只数效果参数。param_len >= 1+期望效果参数长度 接受、多余忽略；更短 NAK 0x04（#4 决议 param_len 向后兼容规则）。仅 SET_EFFECT 做灯效长度表校验，协议层不认识其他灯效语义。",
+    "validation_order": "CRC -> 版本(0x08) -> type(0x02) -> SET_EFFECT 灯效(0x03) -> 长度(0x04)"
+  },
+  "vectors": [
+    {
+      "id": "enc_set_effect_static",
+      "kind": "encode",
+      "desc": "SET_EFFECT 静态灯效：L0 纯红",
+      "frame": {
+        "ver": 1,
+        "seq": 1,
+        "type": 2,
+        "flags": 1,
+        "strip_mask": 1,
+        "payload": "01FF0000"
+      },
+      "expect_hex": "AA550101000201010401FF0000B521"
+    },
+    {
+      "id": "enc_set_brightness",
+      "kind": "encode",
+      "desc": "SET_BRIGHTNESS：全灯带 50%",
+      "frame": {
+        "ver": 1,
+        "seq": 2,
+        "type": 3,
+        "flags": 1,
+        "strip_mask": 255,
+        "payload": "80"
+      },
+      "expect_hex": "AA550102000301FF0180B2E3"
+    },
+    {
+      "id": "enc_get_status",
+      "kind": "encode",
+      "desc": "GET_STATUS：空 payload",
+      "frame": {
+        "ver": 1,
+        "seq": 3,
+        "type": 6,
+        "flags": 0,
+        "strip_mask": 0,
+        "payload": ""
+      },
+      "expect_hex": "AA5501030006000000D6A0"
+    },
+    {
+      "id": "enc_hello",
+      "kind": "encode",
+      "desc": "HELLO：caps + effect_bitmap",
+      "frame": {
+        "ver": 1,
+        "seq": 0,
+        "type": 1,
+        "flags": 0,
+        "strip_mask": 0,
+        "payload": "01010000083C3075983A4655077F000000000000000000000000000000"
+      },
+      "expect_hex": "AA550100000100001D01010000083C3075983A4655077F0000000000000000000000000000005CF6"
+    },
+    {
+      "id": "enc_ack",
+      "kind": "encode",
+      "desc": "ACK：回显 seq 7",
+      "frame": {
+        "ver": 1,
+        "seq": 7,
+        "type": 7,
+        "flags": 0,
+        "strip_mask": 0,
+        "payload": "0700"
+      },
+      "expect_hex": "AA55010700070000020700FF0B"
+    },
+    {
+      "id": "enc_nak_unknown_effect",
+      "kind": "encode",
+      "desc": "NAK：seq 5 / 未知灯效 0x03",
+      "frame": {
+        "ver": 1,
+        "seq": 5,
+        "type": 8,
+        "flags": 0,
+        "strip_mask": 0,
+        "payload": "050003"
+      },
+      "expect_hex": "AA5501050008000003050003522A"
+    },
+    {
+      "id": "enc_set_power_limit",
+      "kind": "encode",
+      "desc": "SET_POWER_LIMIT：15000mA",
+      "frame": {
+        "ver": 1,
+        "seq": 9,
+        "type": 4,
+        "flags": 1,
+        "strip_mask": 255,
+        "payload": "983A"
+      },
+      "expect_hex": "AA550109000401FF02983A3025"
+    },
+    {
+      "id": "enc_unlock_full_power",
+      "kind": "encode",
+      "desc": "UNLOCK_FULL_POWER：解锁",
+      "frame": {
+        "ver": 1,
+        "seq": 10,
+        "type": 5,
+        "flags": 1,
+        "strip_mask": 255,
+        "payload": "01"
+      },
+      "expect_hex": "AA55010A000501FF0101333C"
+    },
+    {
+      "id": "enc_set_effect_param_overlong",
+      "kind": "encode",
+      "desc": "SET_EFFECT 静态：param_len 6 > 期望 1+3，多余忽略",
+      "frame": {
+        "ver": 1,
+        "seq": 8,
+        "type": 2,
+        "flags": 1,
+        "strip_mask": 2,
+        "payload": "01FF0000AABB"
+      },
+      "expect_hex": "AA550108000201020601FF0000AABBE796"
+    },
+    {
+      "id": "feed_single",
+      "kind": "feed",
+      "desc": "单帧一次喂入",
+      "writes": [
+        "AA550101000201010401FF0000B521"
+      ],
+      "expect_frames": [
+        {
+          "ver": 1,
+          "seq": 1,
+          "type": 2,
+          "flags": 1,
+          "strip_mask": 1,
+          "payload": "01FF0000"
+        }
+      ],
+      "expect_errors": [],
+      "expect_remainders": [
+        ""
+      ]
+    },
+    {
+      "id": "feed_coalesced",
+      "kind": "feed",
+      "desc": "粘包：两帧一次喂入",
+      "writes": [
+        "AA550101000201010401FF0000B521AA550102000301FF0180B2E3"
+      ],
+      "expect_frames": [
+        {
+          "ver": 1,
+          "seq": 1,
+          "type": 2,
+          "flags": 1,
+          "strip_mask": 1,
+          "payload": "01FF0000"
+        },
+        {
+          "ver": 1,
+          "seq": 2,
+          "type": 3,
+          "flags": 1,
+          "strip_mask": 255,
+          "payload": "80"
+        }
+      ],
+      "expect_errors": [],
+      "expect_remainders": [
+        ""
+      ]
+    },
+    {
+      "id": "feed_fragmented",
+      "kind": "feed",
+      "desc": "分片：一帧拆两次写入",
+      "writes": [
+        "AA5501030006",
+        "000000D6A0"
+      ],
+      "expect_frames": [
+        {
+          "ver": 1,
+          "seq": 3,
+          "type": 6,
+          "flags": 0,
+          "strip_mask": 0,
+          "payload": ""
+        }
+      ],
+      "expect_errors": [],
+      "expect_remainders": [
+        "AA5501030006",
+        ""
+      ]
+    },
+    {
+      "id": "feed_fragmented_coalesced",
+      "kind": "feed",
+      "desc": "分片 + 粘包混合：四段写入还原三帧",
+      "writes": [
+        "AA550103",
+        "0006000000D6A0AA550102000301FF0180B2E3",
+        "AA55010100",
+        "0201010401FF0000B521"
+      ],
+      "expect_frames": [
+        {
+          "ver": 1,
+          "seq": 3,
+          "type": 6,
+          "flags": 0,
+          "strip_mask": 0,
+          "payload": ""
+        },
+        {
+          "ver": 1,
+          "seq": 2,
+          "type": 3,
+          "flags": 1,
+          "strip_mask": 255,
+          "payload": "80"
+        },
+        {
+          "ver": 1,
+          "seq": 1,
+          "type": 2,
+          "flags": 1,
+          "strip_mask": 1,
+          "payload": "01FF0000"
+        }
+      ],
+      "expect_errors": [],
+      "expect_remainders": [
+        "AA550103",
+        "",
+        "AA55010100",
+        ""
+      ]
+    },
+    {
+      "id": "feed_empty",
+      "kind": "feed",
+      "desc": "空输入",
+      "writes": [
+        ""
+      ],
+      "expect_frames": [],
+      "expect_errors": [],
+      "expect_remainders": [
+        ""
+      ]
+    },
+    {
+      "id": "feed_garbage_prefix",
+      "kind": "feed",
+      "desc": "帧前垃圾字节（含孤立 0xAA）静默丢弃",
+      "writes": [
+        "00AA00AA550101000201010401FF0000B521"
+      ],
+      "expect_frames": [
+        {
+          "ver": 1,
+          "seq": 1,
+          "type": 2,
+          "flags": 1,
+          "strip_mask": 1,
+          "payload": "01FF0000"
+        }
+      ],
+      "expect_errors": [],
+      "expect_remainders": [
+        ""
+      ]
+    },
+    {
+      "id": "feed_crc_error",
+      "kind": "feed",
+      "desc": "CRC 错 -> NAK 0x01",
+      "writes": [
+        "AA550101000201010401FFFF00B521"
+      ],
+      "expect_frames": [],
+      "expect_errors": [
+        {
+          "kind": "crc_error",
+          "error": 1,
+          "seq": 1,
+          "type": 2
+        }
+      ],
+      "expect_remainders": [
+        ""
+      ]
+    },
+    {
+      "id": "feed_seq_mismatch",
+      "kind": "feed",
+      "desc": "seq 错：seq=9 超过 outstanding=8，帧仍合法可识别，不产生 ACK",
+      "writes": [
+        "AA550109000201010401FF0000FE6B"
+      ],
+      "expect_frames": [
+        {
+          "ver": 1,
+          "seq": 9,
+          "type": 2,
+          "flags": 1,
+          "strip_mask": 1,
+          "payload": "01FF0000"
+        }
+      ],
+      "expect_errors": [],
+      "expect_remainders": [
+        ""
+      ],
+      "last_outstanding_seq": 8,
+      "expect_ack_generated": false
+    },
+    {
+      "id": "feed_ack_echo",
+      "kind": "feed",
+      "desc": "ACK 回显 seq=7，编解码可识别（匹配逻辑在 BleLink）",
+      "writes": [
+        "AA55010700070000020700FF0B"
+      ],
+      "expect_frames": [
+        {
+          "ver": 1,
+          "seq": 7,
+          "type": 7,
+          "flags": 0,
+          "strip_mask": 0,
+          "payload": "0700"
+        }
+      ],
+      "expect_errors": [],
+      "expect_remainders": [
+        ""
+      ],
+      "last_outstanding_seq": 7,
+      "expect_ack_generated": false
+    },
+    {
+      "id": "feed_unknown_type",
+      "kind": "feed",
+      "desc": "未知 type 0x0A -> NAK 0x02",
+      "writes": [
+        "AA55010B000A000000A6E2"
+      ],
+      "expect_frames": [],
+      "expect_errors": [
+        {
+          "kind": "unknown_type",
+          "error": 2,
+          "seq": 11,
+          "type": 10
+        }
+      ],
+      "expect_remainders": [
+        ""
+      ]
+    },
+    {
+      "id": "feed_unknown_effect",
+      "kind": "feed",
+      "desc": "未知灯效 0x07 -> NAK 0x03",
+      "writes": [
+        "AA55010C0002010101075762"
+      ],
+      "expect_frames": [],
+      "expect_errors": [
+        {
+          "kind": "unknown_effect",
+          "error": 3,
+          "seq": 12,
+          "type": 2
+        }
+      ],
+      "expect_remainders": [
+        ""
+      ]
+    },
+    {
+      "id": "feed_param_len_short",
+      "kind": "feed",
+      "desc": "呼吸（效果参数期望 7，param_len 需 >= 8）param_len=4 -> NAK 0x04",
+      "writes": [
+        "AA55010D000201010402FF0000175D"
+      ],
+      "expect_frames": [],
+      "expect_errors": [
+        {
+          "kind": "length_mismatch",
+          "error": 4,
+          "seq": 13,
+          "type": 2
+        }
+      ],
+      "expect_remainders": [
+        ""
+      ]
+    },
+    {
+      "id": "feed_param_len_over",
+      "kind": "feed",
+      "desc": "静态（param_len 需 >= 4）param_len=6 -> 接受，多余忽略",
+      "writes": [
+        "AA55010E000201020601FF0000AABBD99D"
+      ],
+      "expect_frames": [
+        {
+          "ver": 1,
+          "seq": 14,
+          "type": 2,
+          "flags": 1,
+          "strip_mask": 2,
+          "payload": "01FF0000AABB"
+        }
+      ],
+      "expect_errors": [],
+      "expect_remainders": [
+        ""
+      ]
+    },
+    {
+      "id": "feed_bad_version",
+      "kind": "feed",
+      "desc": "ver=2 -> NAK 0x08",
+      "writes": [
+        "AA55020F0002010103FF00004A7C"
+      ],
+      "expect_frames": [],
+      "expect_errors": [
+        {
+          "kind": "bad_version",
+          "error": 8,
+          "seq": 15,
+          "type": 2
+        }
+      ],
+      "expect_remainders": [
+        ""
+      ]
+    },
+    {
+      "id": "feed_two_errors",
+      "kind": "feed",
+      "desc": "两帧连续出错：先 unknown_type 后 crc_error，顺序保持",
+      "writes": [
+        "AA55010B000A000000A6E2AA550101000201010401FFFF00B521"
+      ],
+      "expect_frames": [],
+      "expect_errors": [
+        {
+          "kind": "unknown_type",
+          "error": 2,
+          "seq": 11,
+          "type": 10
+        },
+        {
+          "kind": "crc_error",
+          "error": 1,
+          "seq": 1,
+          "type": 2
+        }
+      ],
+      "expect_remainders": [
+        ""
+      ]
+    },
+    {
+      "id": "feed_resync_new_magic",
+      "kind": "feed",
+      "desc": "半帧未完成时遇到新 magic：丢弃半帧，解析新帧",
+      "writes": [
+        "AA5501020003",
+        "AA5501030006000000D6A0"
+      ],
+      "expect_frames": [
+        {
+          "ver": 1,
+          "seq": 3,
+          "type": 6,
+          "flags": 0,
+          "strip_mask": 0,
+          "payload": ""
+        }
+      ],
+      "expect_errors": [],
+      "expect_remainders": [
+        "AA5501020003",
+        ""
+      ]
+    }
+  ]
 }
