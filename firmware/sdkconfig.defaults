@@ -1,6 +1,11 @@
 CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
 CONFIG_ESPTOOLPY_FLASHSIZE="4MB"
 
+# #7 §1：OTA-ready 分区表（factory 1M + ota_0 1M + ota_1 1M + nvs/otadata/phy）。
+# OTA 实现本身 out-of-scope，但分区表现在就上，避免布局变更破坏平滑升级。
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+
 # #13 RMT 缓解包（#7 §3）：
 # ① 编码函数进 IRAM（rmt_driver.c 的 txe_encode 等带 RMT_ENCODER_FUNC_ATTR）
 CONFIG_RMT_ENCODER_FUNC_IN_IRAM=y

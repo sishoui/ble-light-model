@@ -1,0 +1,16 @@
+# BLE Light Model —— OTA-ready 分区表（#7 §1，官方 4MB 布局）。
+#
+# factory 1M + ota_0 1M + ota_1 1M + nvs/otadata/phy。
+# OTA 实现本身 out-of-scope，但现在就把分区表上好，避免后续分区布局变更
+# 导致量产设备无法平滑升级（#7 §1「OTA-ready 分区现在就上」）。
+#
+# 布局依据：ESP-IDF 官方 examples 的 4MB OTA 示例（esp-idf 5.5.3）。
+# 总占用 = 0x10000 + 3*0x100000 = 0x310000（约 3.06MB），4MB flash 余量充足。
+
+# Name,   Type, SubType, Offset,    Size,      Flags
+nvs,      data, nvs,     0x9000,    0x4000,
+otadata,  data, ota,     0xa000,    0x2000,
+phy_init, data, phy,     0xc000,    0x1000,
+factory,  app,  factory, 0x10000,   0x100000,
+ota_0,    app,  ota_0,   0x110000,  0x100000,
+ota_1,    app,  ota_1,   0x210000,  0x100000,
