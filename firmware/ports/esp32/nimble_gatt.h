@@ -19,7 +19,7 @@ extern "C" {
  * - CMD 写回调：分片累积（ble_proto_feed，静态缓冲 266 字节）→ 完整帧
  *   → core gatt_dispatch → 动作执行（effect_apply / brightness / ACK /
  *   NAK / STATUS）→ 需要时 RSP notify。
- * - 连接建立 + CCCD 订阅后：C3 主动发 HELLO（23 字节 payload 帧）。
+ * - 连接建立 + CCCD 订阅后：C3 主动发 HELLO（29 字节 payload 帧，effect_bitmap[16]）。
  * - 周期 STATUS：2s（定时器回调里只做组帧 + notify，不重活）。
  * - 满功率门禁 / 解锁在 core 分发层（gatt.c），ports 只执行。
  * - 断连：保持灯效继续跑（led_task 不感知）；新连接重新发 HELLO。

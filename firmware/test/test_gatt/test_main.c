@@ -2,7 +2,7 @@
  * BLE 控制面单测（native / Unity）：命令分发、满功率门禁、STATUS/HELLO
  * 组帧、ACK/NAK 字节级断言。
  *
- * 断言基准：#4 决议第 2/3/4 节。STATUS 24 字节与 HELLO 23 字节布局逐
+ * 断言基准：#4 决议第 2/3/4 节。STATUS 24 字节与 HELLO 29 字节布局逐
  * 字节对照 spec 手算；ACK/NAK 经 ble_proto_encode 与 proto golden 向量
  * 同口径（真实帧字节，不是结构体断言）。
  */

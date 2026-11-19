@@ -37,7 +37,7 @@ export interface FakeLightDeviceOptions {
   powerLimitMa?: number;
   /** 启动亮度（固件默认 128）。 */
   brightness?: number;
-  /** HELLO effect_bitmap[10] 首字节（默认 0x7f，覆盖 effect_id 0–6）。 */
+  /** HELLO effect_bitmap[16] 首字节（默认 0x7f，覆盖 effect_id 0–7；其余字节 0）。 */
   effectBitmapByte0?: number;
   /** 初始解锁态（默认 false；真实固件启动恒受限，仅供用例构造特殊场景）。 */
   unlocked?: boolean;
