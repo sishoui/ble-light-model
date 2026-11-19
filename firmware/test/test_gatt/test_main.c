@@ -119,7 +119,7 @@ static void test_dispatch_brightness_50pct_boundary_ok(void)
     f.payload_len = 1;
     f.payload[0] = 127;
     TEST_ASSERT_EQUAL_INT(GATT_ACT_SET_BRIGHTNESS,
-                          gatt_dispatch(&d, &f, &act, 1) ? act.type : -1);
+                          gatt_dispatch(&d, &f, &act, 1) ? (int)act.type : -1);
     TEST_ASSERT_EQUAL_INT(GATT_ACT_SET_BRIGHTNESS, act.type);
 }
 
@@ -136,7 +136,7 @@ static void test_dispatch_brightness_strip_mask_must_be_ff(void)
     f.payload_len = 1;
     f.payload[0] = 10;
 
-    TEST_ASSERT_EQUAL_INT(GATT_ACT_NAK, gatt_dispatch(&d, &f, &act, 1) ? act.type : -1);
+    TEST_ASSERT_EQUAL_INT(GATT_ACT_NAK, gatt_dispatch(&d, &f, &act, 1) ? (int)act.type : -1);
     TEST_ASSERT_EQUAL_UINT8(BLE_PROTO_NAK_INVALID_PARAM, act.error);
 }
 
@@ -152,7 +152,7 @@ static void test_dispatch_brightness_len_mismatch(void)
     f.strip_mask = 0xFF;
     f.payload_len = 0;
 
-    TEST_ASSERT_EQUAL_INT(GATT_ACT_NAK, gatt_dispatch(&d, &f, &act, 1) ? act.type : -1);
+    TEST_ASSERT_EQUAL_INT(GATT_ACT_NAK, gatt_dispatch(&d, &f, &act, 1) ? (int)act.type : -1);
     TEST_ASSERT_EQUAL_UINT8(BLE_PROTO_NAK_LENGTH_MISMATCH, act.error);
 }
 
@@ -173,7 +173,7 @@ static void test_dispatch_power_limit_over_15000_not_unlocked_nak06(void)
     f.payload[0] = 0x20;
     f.payload[1] = 0x4E; /* 20000 */
 
-    TEST_ASSERT_EQUAL_INT(GATT_ACT_NAK, gatt_dispatch(&d, &f, &act, 1) ? act.type : -1);
+    TEST_ASSERT_EQUAL_INT(GATT_ACT_NAK, gatt_dispatch(&d, &f, &act, 1) ? (int)act.type : -1);
     TEST_ASSERT_EQUAL_UINT8(BLE_PROTO_NAK_NOT_UNLOCKED, act.error);
 }
 
@@ -190,7 +190,7 @@ static void test_dispatch_power_limit_over_30000_nak05(void)
     f.payload[0] = 0x31;
     f.payload[1] = 0x75; /* 30001 */
 
-    TEST_ASSERT_EQUAL_INT(GATT_ACT_NAK, gatt_dispatch(&d, &f, &act, 1) ? act.type : -1);
+    TEST_ASSERT_EQUAL_INT(GATT_ACT_NAK, gatt_dispatch(&d, &f, &act, 1) ? (int)act.type : -1);
     TEST_ASSERT_EQUAL_UINT8(BLE_PROTO_NAK_INVALID_PARAM, act.error);
 }
 
@@ -207,7 +207,7 @@ static void test_dispatch_power_limit_short_payload_nak04(void)
     f.payload_len = 1;
     f.payload[0] = 0x10;
 
-    TEST_ASSERT_EQUAL_INT(GATT_ACT_NAK, gatt_dispatch(&d, &f, &act, 1) ? act.type : -1);
+    TEST_ASSERT_EQUAL_INT(GATT_ACT_NAK, gatt_dispatch(&d, &f, &act, 1) ? (int)act.type : -1);
     TEST_ASSERT_EQUAL_UINT8(BLE_PROTO_NAK_LENGTH_MISMATCH, act.error);
 }
 
@@ -244,7 +244,7 @@ static void test_dispatch_unlock_bad_arg_nak05(void)
     f.payload_len = 1;
     f.payload[0] = 2; /* 非 0/1 */
 
-    TEST_ASSERT_EQUAL_INT(GATT_ACT_NAK, gatt_dispatch(&d, &f, &act, 1) ? act.type : -1);
+    TEST_ASSERT_EQUAL_INT(GATT_ACT_NAK, gatt_dispatch(&d, &f, &act, 1) ? (int)act.type : -1);
     TEST_ASSERT_EQUAL_UINT8(BLE_PROTO_NAK_INVALID_PARAM, act.error);
 }
 
@@ -261,7 +261,7 @@ static void test_dispatch_unlock_mask_must_be_ff(void)
     f.payload_len = 1;
     f.payload[0] = 1;
 
-    TEST_ASSERT_EQUAL_INT(GATT_ACT_NAK, gatt_dispatch(&d, &f, &act, 1) ? act.type : -1);
+    TEST_ASSERT_EQUAL_INT(GATT_ACT_NAK, gatt_dispatch(&d, &f, &act, 1) ? (int)act.type : -1);
     TEST_ASSERT_EQUAL_UINT8(BLE_PROTO_NAK_INVALID_PARAM, act.error);
 }
 
@@ -295,7 +295,7 @@ static void test_dispatch_server_types_nak02(void)
         memset(&f, 0, sizeof(f));
         f.type = types[i];
         TEST_ASSERT_EQUAL_INT(GATT_ACT_NAK,
-                              gatt_dispatch(&d, &f, &act, 1) ? act.type : -1);
+                              gatt_dispatch(&d, &f, &act, 1) ? (int)act.type : -1);
         TEST_ASSERT_EQUAL_UINT8(BLE_PROTO_NAK_UNKNOWN_TYPE, act.error);
     }
 }
