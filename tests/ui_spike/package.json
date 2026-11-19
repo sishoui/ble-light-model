@@ -1,0 +1,22 @@
+{
+  "name": "@ble-light-model/ui-spike",
+  "version": "0.0.0",
+  "private": true,
+  "description": "UI 回归 spike（spec §3.5 / 工单 #19）：wxa-runner（vendored 0.14.0）+ Playwright + Chrome，wx 层 BLE mock 复用 FakeTransport/FakeLightDevice 场景引擎",
+  "scripts": {
+    "build:mp": "node ../../miniprogram/scripts/build-dist.mjs",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "npm run typecheck && playwright test",
+    "test:headed": "playwright test --headed"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.65.1",
+    "typescript": "~5.9.3",
+    "@open-wxa/wxa-baselib": "file:vendor/wxa-baselib",
+    "@open-wxa/wxa-runner-compiler": "file:vendor/wxa-runner-compiler",
+    "@open-wxa/wxa-runner-core": "file:vendor/wxa-runner-core",
+    "@open-wxa/wxa-runner-extractor": "file:vendor/wxa-runner-extractor",
+    "@open-wxa/wxa-runner-playwright": "file:vendor/wxa-runner-playwright",
+    "wxa-runner": "file:vendor/wxa-runner"
+  }
+}

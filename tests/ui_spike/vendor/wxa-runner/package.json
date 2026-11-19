@@ -1,0 +1,54 @@
+{
+  "name": "wxa-runner",
+  "version": "0.14.0",
+  "description": "Run WeChat Mini Programs in the browser on the official base library, for debugging and E2E testing",
+  "keywords": [
+    "wechat",
+    "miniprogram",
+    "mini-program",
+    "weapp",
+    "runtime",
+    "simulator",
+    "e2e",
+    "testing",
+    "playwright",
+    "uni-app",
+    "taro"
+  ],
+  "license": "MIT",
+  "author": "open-wxa",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/open-wxa/wxa-runner.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://open-wxa.github.io/wxa-runner/",
+  "bugs": {
+    "url": "https://github.com/open-wxa/wxa-runner/issues"
+  },
+  "types": "./index.d.ts",
+  "bin": {
+    "wxa-runner": "./bin/wxa-runner.js"
+  },
+  "files": [
+    "bin",
+    "index.d.ts"
+  ],
+  "dependencies": {
+    "@vercel/detect-agent": "^1.2.7",
+    "chalk": "^4.1.2",
+    "commander": "^11.1.0",
+    "@open-wxa/wxa-runner-core": "0.14.0",
+    "@open-wxa/wxa-runner-extractor": "0.14.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "scripts": {
+    "dev": "node bin/wxa-runner.js"
+  }
+}

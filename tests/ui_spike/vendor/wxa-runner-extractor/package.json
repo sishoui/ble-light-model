@@ -1,0 +1,34 @@
+{
+  "name": "@open-wxa/wxa-runner-extractor",
+  "version": "0.14.0",
+  "description": "Locate and extract the official WeChat mini-program base library from a local WeChat DevTools installation",
+  "license": "MIT",
+  "author": "open-wxa",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/open-wxa/wxa-runner.git",
+    "directory": "packages/extractor"
+  },
+  "homepage": "https://open-wxa.github.io/wxa-runner/",
+  "bugs": {
+    "url": "https://github.com/open-wxa/wxa-runner/issues"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "optionalDependencies": {
+    "@open-wxa/wxa-baselib": "^0.1.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "scripts": {
+    "build": "tsup"
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "name": "@open-wxa/wxa-runner-compiler",
+  "version": "0.14.0",
+  "description": "Wrapper around the official WXML/WXSS compilers (wcc/wcsc) shipped with WeChat DevTools",
+  "license": "MIT",
+  "author": "open-wxa",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/open-wxa/wxa-runner.git",
+    "directory": "packages/compiler"
+  },
+  "homepage": "https://open-wxa.github.io/wxa-runner/",
+  "bugs": {
+    "url": "https://github.com/open-wxa/wxa-runner/issues"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@open-wxa/wxa-runner-extractor": "0.14.0"
+  },
+  "optionalDependencies": {
+    "miniprogram-compiler": "0.2.3"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "scripts": {
+    "build": "tsup"
+  }
+}

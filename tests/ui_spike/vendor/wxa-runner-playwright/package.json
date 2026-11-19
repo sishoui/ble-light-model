@@ -1,0 +1,57 @@
+{
+  "name": "@open-wxa/wxa-runner-playwright",
+  "version": "0.14.0",
+  "description": "Playwright fixture for wxa-runner: starts the dev server per worker, reads page data and asserts mini-program requests",
+  "keywords": [
+    "wechat",
+    "miniprogram",
+    "mini-program",
+    "weapp",
+    "playwright",
+    "fixture",
+    "e2e",
+    "testing",
+    "uni-app"
+  ],
+  "license": "MIT",
+  "author": "open-wxa",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/open-wxa/wxa-runner.git",
+    "directory": "packages/playwright"
+  },
+  "homepage": "https://open-wxa.github.io/wxa-runner/",
+  "bugs": {
+    "url": "https://github.com/open-wxa/wxa-runner/issues"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@open-wxa/wxa-runner-core": "0.14.0"
+  },
+  "peerDependencies": {
+    "@playwright/test": ">=1.64.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "scripts": {
+    "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsup",
+    "dev": "tsup --watch"
+  }
+}

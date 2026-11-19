@@ -54,3 +54,5 @@ _Avoid_: 错误码、异常
 
 **PC 集成测试**: PC 蓝牙适配器当 BLE 中心直连 C3，走真实 BLE 与 COM6 串口日志做断言，验证固件 / 协议层；与 FakeTransport 单测、真机全链路测试分层。
 _Avoid_: PC 测试、直连测试
+
+**wx 层 BLE mock**: C 层（UI 回归 spike）的 BLE 模拟：替换 WxTransport 调用的 `wx.*` 函数（不绕过 WxTransport），设备模型复用 FakeTransport/FakeLightDevice，不出现第二套假蓝牙；由 wxa-runner setup 注册 invoke 型 API，事件型（on*）经 `__wxaHost.emitToService` 派发。

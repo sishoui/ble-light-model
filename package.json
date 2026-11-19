@@ -5,10 +5,12 @@
   "scripts": {
     "typecheck": "npm --prefix miniprogram run typecheck",
     "check:purity": "npm --prefix miniprogram run check:purity",
+    "build:mp": "npm --prefix miniprogram run build:dist",
     "test:logic": "npm --prefix miniprogram run test",
     "test:firmware": "pio run -d firmware -e native && pio test -d firmware -e native",
     "build:native": "pio run -d firmware -e native",
     "build:esp32c3": "pio run -d firmware -e esp32-c3",
+    "test:ui": "npm --prefix tests/ui_spike run build:mp && npm --prefix tests/ui_spike run test",
     "test": "npm run typecheck && npm run check:purity && npm run test:logic && npm run test:firmware"
   }
 }

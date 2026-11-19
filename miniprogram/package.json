@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit",
+    "build:dist": "node scripts/build-dist.mjs",
     "test": "vitest run",
     "check:purity": "node scripts/check-purity.mjs"
   },

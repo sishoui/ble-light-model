@@ -1,7 +1,14 @@
 node_modules/
-dist/
+# 只忽略仓库根的构建产物；vendored wxa-runner 的运行时代码在
+# tests/ui_spike/vendor/*/dist/，不能被这条规则命中
+/dist/
 coverage/
 *.tsbuildinfo
+
+# UI spike (tests/ui_spike) 运行产物
+test-results/
+playwright-report/
+tests/ui_spike/diagnostic.png
 
 # PlatformIO
 .pio/
