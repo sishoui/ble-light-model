@@ -1,0 +1,23 @@
+{
+  "description": "页面默认参数下 7 种灯效的 SET_EFFECT payload 期望（真机场景 2 的 COM6/STATUS 断言面；miniprogram/logic/device_effects_contract.test.ts 对照 encodeEffectPayload 校验，防手抄漂移）。payload = effect_id(1) + 效果参数，与 tests/protocol/vectors.json golden 对齐。",
+  "page_defaults": {
+    "color": { "r": 255, "g": 0, "b": 0 },
+    "color2": { "r": 0, "g": 80, "b": 255 },
+    "periodMs": 2000,
+    "speed": 5,
+    "length": 5,
+    "density": 5,
+    "min": 0,
+    "max": 255,
+    "saturation": 255
+  },
+  "effects": [
+    { "index": 0, "key": "off", "name": "关灯", "effectId": 0, "payloadHex": "00", "golden": null },
+    { "index": 1, "key": "static", "name": "静态", "effectId": 1, "payloadHex": "01FF0000", "golden": "enc_set_effect_static" },
+    { "index": 2, "key": "breath", "name": "呼吸", "effectId": 2, "payloadHex": "02FF0000D00700FF", "golden": null },
+    { "index": 3, "key": "gradient", "name": "渐变", "effectId": 3, "payloadHex": "03FF00000050FFD0070000", "golden": null },
+    { "index": 4, "key": "rainbow", "name": "彩虹", "effectId": 4, "payloadHex": "0405FF00", "golden": null },
+    { "index": 5, "key": "flow", "name": "流水", "effectId": 5, "payloadHex": "05FF000005050000", "golden": null },
+    { "index": 6, "key": "twinkle", "name": "星闪", "effectId": 6, "payloadHex": "06FF00000505", "golden": null }
+  ]
+}

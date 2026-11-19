@@ -206,7 +206,7 @@ describe("LightService.setEffect", () => {
       "02" + "010203" + "e803" + "0a" + "c8", // breath: period 1000, min 10, max 200
       "03" + "010203" + "040506" + "d007" + "01" + "00", // gradient: to=040506, period 2000, dir 1, 末尾保留字节
       "04" + "05" + "c8" + "00", // rainbow: speed 5, sat 200, dir 0
-      "05" + "090807" + "03" + "0a" + "01", // flow: color 090807, speed 3, length 10, dir 1
+      "05" + "090807" + "03" + "0a" + "01" + "00", // flow: color 090807, speed 3, length 10, dir 1, 末尾保留字节（参数长度 7）
       "06" + "010203" + "64" + "04", // twinkle: density 100, speed 4
     ]);
   });
