@@ -123,11 +123,13 @@ export class FakeLightDevice {
 
     // HELLO 在订阅（setNotification(true)）后由 C3 主动下发；FakeTransport 会在每次
     // setNotification(true) 时重推 notifyFrames，正好覆盖重连后重新发 HELLO。
+    // 用 this.txSeq++ 消费一个序号：C3 的 HELLO/ACK/NAK/STATUS 用独立 tx seq，
+    // 帧头 seq 与客户端 seq 解耦（#4 口径，LightService 按 payload ack_seq 关联）。
     this.transport.setNotifyFrames([
       bytesToHex(
         encode({
           version: 1,
-          seq: 0,
+          seq: this.txSeq++,
           type: FRAME_TYPES.hello,
           flags: 0,
           stripMask: 0,

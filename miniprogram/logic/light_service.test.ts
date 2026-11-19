@@ -11,6 +11,7 @@ import { InvalidStateError, TimeoutError } from "./errors";
 import { EffectParamError, LightService, encodeEffectPayload } from "./light_service";
 import type { EffectParams } from "./light_service";
 import { FakeTransport, bytesToHex, hexToBytes } from "./test_utils/fake_transport";
+import { FakeLightDevice } from "./test_utils/fake_device";
 
 /** 状态帧 payload（#4 §4，24 字节）；uptime 1s，temp 30，active_effect L0=静态。 */
 function statusHex(): string {
@@ -30,11 +31,21 @@ function statusHex(): string {
   return bytesToHex(encode({ version: 1, seq: 7, type: FRAME_TYPES.status, flags: 0, stripMask: 0, payload }));
 }
 
-/** ACK 帧（seq 任意，LightService 不关心）。 */
+/** ACK 帧（LightService 按 payload ack_seq 关联，帧头 seq 任意）。 */
 function ackHex(): string {
   const payload = new Uint8Array(2);
   new DataView(payload.buffer).setUint16(0, 0, true);
   return bytesToHex(encode({ version: 1, seq: 0, type: FRAME_TYPES.ack, flags: 0, stripMask: 0, payload }));
+}
+
+/**
+ * ACK 帧（payload 回显客户端 seq）；帧头 seq 用独立值 0x5a5a，验证 LightService
+ * 按 payload ack_seq 关联而非帧头 seq（#4：C3 的 notify 用独立 tx seq）。
+ */
+function ackHexFor(seq: number): string {
+  const payload = new Uint8Array(2);
+  new DataView(payload.buffer).setUint16(0, seq, true);
+  return bytesToHex(encode({ version: 1, seq: 0x5a5a, type: FRAME_TYPES.ack, flags: 0, stripMask: 0, payload }));
 }
 
 /** 用 FakeTransport 组装（BleLink, LightService)，notifySettleMs=0 提速。 */
@@ -172,15 +183,8 @@ describe("LightService.setEffect", () => {
       const [mask, params] = cases[i]!;
       const pending = service.setEffect(mask, params);
       seqs.push(i);
-      const ack = encode({
-        version: 1,
-        seq: i,
-        type: FRAME_TYPES.ack,
-        flags: 0,
-        stripMask: 0,
-        payload: hexToBytes("0000"),
-      });
-      transport.emitNotification(bytesToHex(ack));
+      // C3 回 ACK（payload ack_seq 回显客户端 seq i；帧头 seq 无关）。
+      transport.emitNotification(ackHexFor(i));
       await pending;
     }
 
@@ -218,15 +222,8 @@ describe("LightService.setEffect", () => {
     const first = service.setEffect(0x01, { effect: "off" });
     const second = service.setEffect(0x01, { effect: "static", color: { r: 0xff, g: 0, b: 0 } });
     for (const seq of [0, 1]) {
-      const ack = encode({
-        version: 1,
-        seq,
-        type: FRAME_TYPES.ack,
-        flags: 0,
-        stripMask: 0,
-        payload: hexToBytes("0000"),
-      });
-      transport.emitNotification(bytesToHex(ack));
+      // 顺序回 ACK（payload ack_seq = 客户端 seq；帧头 seq 无关）。
+      transport.emitNotification(ackHexFor(seq));
     }
     await Promise.all([first, second]);
 
@@ -321,6 +318,29 @@ describe("LightService 写结果（ACK / NAK）", () => {
     // 模拟 C3 收到 seq=0 后回 ACK（从 transport 侧注入）。
     transport.emitNotification(ackHex());
     await expect(pending).resolves.toBeUndefined();
+  });
+
+  it("C3 帧头 seq 与客户端 seq 解耦时按 payload ack_seq 关联（旧实现按帧头匹配会挂）", async () => {
+    // FakeLightDevice 用独立 tx seq：HELLO 消耗 seq 0，客户端 setEffect seq 0
+    // 的 ACK 帧头 seq=1 ≠ 客户端 seq 0 —— 旧实现按帧头匹配会永远等不到、超时挂起。
+    let device: FakeLightDevice;
+    const transport = new FakeTransport({
+      mtu: 247,
+      onWrite: (b) => device.onWrite(b),
+    });
+    device = new FakeLightDevice(transport, {});
+    const link = new BleLink(transport, {
+      scanTimeoutMs: 20,
+      reconnectDelayMs: 20,
+      notifySettleMs: 0,
+      autoReconnect: false,
+    });
+    const service = new LightService(link);
+    await service.scan({ timeoutMs: 10 });
+    await service.connect();
+    await service.setEffect(0x01, { effect: "static", color: { r: 255, g: 0, b: 0 } });
+    expect(device.activeEffect[0]).toBe(1); // L0 已落地灯效
+    expect(device.activeEffect[1]).toBe(0xff); // L1 未选
   });
 
   it("C3 回 NAK 0x06（未解锁）：setEffect reject ServiceNakError", async () => {

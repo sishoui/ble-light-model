@@ -488,9 +488,13 @@ export class LightService {
         return;
       }
       case FRAME_TYPES.ack: {
-        const waiter = this.pending.get(frame.seq);
+        // 关联键 = payload ack_seq(2)（#4：ACK 回显被确认帧 seq；C3 的
+        // HELLO/STATUS/NAK 用独立 tx seq，帧头 seq ≠ 客户端 seq，不能按帧头匹配）。
+        if (frame.payload.length < 2) return;
+        const ackSeq = frame.payload[0]! | (frame.payload[1]! << 8);
+        const waiter = this.pending.get(ackSeq);
         if (waiter === undefined) return;
-        this.pending.delete(frame.seq);
+        this.pending.delete(ackSeq);
         if (waiter.timer !== undefined) clearTimeout(waiter.timer);
         waiter.resolve();
         return;
