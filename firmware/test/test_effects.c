@@ -10,8 +10,7 @@
 
 #define ARRAY_LEN(a) (sizeof(a) / sizeof((a)[0]))
 
-void setUp(void) {}
-void tearDown(void) {}
+/* setUp/tearDown are defined once in test_driver.c (single test binary). */
 
 /* ---------- 工具 ---------- */
 
@@ -219,11 +218,11 @@ static void test_breath_sine_extremes(void)
     TEST_ASSERT_EQUAL_INT(LIGHT_LEDS, lit);
 }
 
-/* ---------- main ---------- */
+/* ---------- 注册入口（由 test_driver.c 的统一 main 调用） ---------- */
 
-int main(void)
+/* 本文件定义全部灯效测试；main() 唯一性由 test_driver.c 统一持有。 */
+void run_effects_tests(void)
 {
-    UNITY_BEGIN();
     RUN_TEST(test_d3_all_effects_deterministic);
     RUN_TEST(test_off_all_zero);
     RUN_TEST(test_d4_speed_zero_freeze);
@@ -232,5 +231,4 @@ int main(void)
     RUN_TEST(test_sparkle_hash_deterministic);
     RUN_TEST(test_sparkle_hash_known_values);
     RUN_TEST(test_breath_sine_extremes);
-    return UNITY_END();
 }
