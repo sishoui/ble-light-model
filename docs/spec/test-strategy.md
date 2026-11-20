@@ -129,7 +129,7 @@
 ## 8. 前置项与待定
 
 **前置（blocker，不做则层 3 自欺）**：
-- **`vectors.json` 分片向量缺口**：`encode/fragment_20` 与 `feed/fragmented` 的 `chunks` 实际只有 1 个 19B 块（breath 帧整帧 < 20B），**没真测到 20 字节分片/重组**，与 `protocol.md` §13 描述不符。需补至少一条真正 `> 20B` 的切片向量（分多块 + 粘包重组），再让三端对拍。
+- **~~`vectors.json` 分片向量缺口~~（已消除）**：~~`encode/fragment_20` 与 `feed/fragmented` 的 `chunks` 实际只有 1 个 19B 块（breath 帧整帧 < 20B），没真测到 20 字节分片/重组，与 `protocol.md` §13 描述不符。~~ 已由 #30 补齐真正的 `> 20B` 切片向量：`encode/fragment_60`（51B→20/20/11）、`feed/fragment_60_reassembly`（三块逐个喂入重组）、`feed/coalesced_multiframe`（两条 51B 帧粘包切两帧）、以及 19/20/21B 边界钉（`fragment_boundary_19/20/21`）。三端对拍已由 run-all.mjs 的 golden 自洽覆盖。
 - **固件测试遥测 tag 契约**：`driver.md` 需加一节"测试遥测"——`T:` 前缀的机器可读行（如 `T:glitch_count=0`、`T:frame_ms=12.4`、`T:ack_seq=17`），层 4 runner 解析这些行做交叉断言而非人眼读日志；`T:` 流仅 dev/test 构建、release 编译期 `-D` 关；`glitch_count` / `drop_count` 常驻（已是 STATUS 字段，release 也留）。
 
 **Not yet specified**（本票不决，留待实现后）：
