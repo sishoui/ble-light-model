@@ -231,7 +231,7 @@ t0 + 3.000 tx_done(s1)
 
 ### 3.5 对照实现：`rmt_tx_switch_gpio`
 
-藏在同一个 `ports->route(ch, slot)` 后面：`rmt_disable()` → `rmt_tx_switch_gpio()` → `rmt_enable()` → `tx_submit()`。代价是排空队列、重挂 GPIO Matrix、反复申请/释放 PM 锁（#23 §2.4），旧脚在 `gpio_output_disable()` 后同样变高阻。它只作为 A/B 对照与主路径门禁失败时的降级路径（§7 B0/B9）。
+藏在同一个 `ports->route(ch, slot)` 后面：`rmt_disable()` → `rmt_tx_switch_gpio()` → `rmt_enable()` → `tx_submit()`。代价是排空队列、重挂 GPIO Matrix、反复申请/释放 PM 锁（#23 §2.4），旧脚在 `gpio_output_disable()` 后同样变高阻。它只作为 A/B 对照与主路径门禁失败时的降级路径（§8 B0/B9）。
 
 ---
 
@@ -359,7 +359,80 @@ void frame_task(void *arg) {
 
 ---
 
-## 6. host 单测清单
+## 6. 测试遥测（T: 行）
+
+机器可读的驱动层遥测契约，供层 4 PC 影子跑 runner 解析做**交叉断言**，而非人眼读串口日志。遥测流只出现在 dev/test 构建；release 编译期关闭。**它不替代 STATUS**：`glitch_count` / `drop_count` 已是 `STATUS` 字段（`protocol.md` §7），常驻、release 也保留；遥测行只在 dev/test 下作为更高频、更细粒度的补充观测源。
+
+### 6.1 行格式
+
+单行一条，`T:` 前缀，`\n` 结尾：
+
+```text
+T:<key>=<value>
+```
+
+- `key` 用 snake_case，`value` 为十进制整数或浮点（无单位）。
+- 一行一个键值，不在一行拼多个；解析器按 `^T:` 行匹配，`key=value` 用 `=` 切一次。
+- 出现顺序不保证；runner 按 key 取值，不依赖行序。
+- 例：
+
+```text
+T:glitch_count=0
+T:drop_count=0
+T:frame_ms=12.4
+T:ack_seq=17
+T:ch0_slot=2
+```
+
+### 6.2 字段集合
+
+| key | 类型 | 单位 | 出现时机 | 含义 / 断言用途 |
+|---|---|---|---|---|
+| `glitch_count` | `uint16` | 次 | 每当变化（与 STATUS 同口径） | 帧起点迟到计数；层 4 断言窗口内 `== 0`。 |
+| `drop_count` | `uint16` | 次 | 每当变化（与 STATUS 同口径） | 半帧超时丢弃的接收帧计数。 |
+| `frame_ms` | `float` | ms | 每帧（聚合时取最近值） | 实际帧周期实测；层 4 只断言 `≥ 60Hz`（≤16.7 ms），不断言 80 Hz。 |
+| `ack_seq` | `uint16` | — | 每当收到/发出 ACK/NAK | 最后 ACK/NAK seq；层 4 与协议层预期 seq 对拍。 |
+| `ch0_slot` / `ch1_slot` | `uint8` | 槽位 | 每当切换 | 当前正在发送的槽位；断言与调度阶梯一致。 |
+| `heartbeat_ms` | `uint32` | ms | 每当静态条心跳 | 相邻两次心跳间隔；断言 `200ms ±5ms`。 |
+| `strip_state` | `uint8` | — | 每当活动/静态/IDLE 分类变化 | bit 布局见下；断言灯带分类符合 §1.2。 |
+
+`strip_state` bit i = 第 i 条状态：`0=IDLE`，`1=活动`，`2=静态`（每条 2 bit，8 条共 16 bit，按 `uint32` 输出）。
+
+`glitch_count` / `drop_count` 与 STATUS 共用同一计数器（`light_core_glitch_count()`），遥测行只是把它们更频繁地外放；STATUS 仍是 release 唯一常驻出口。
+
+### 6.3 输出时机与节流
+
+避免刷屏：dev/test 下默认**每秒聚合一行**（或每帧只更新，按秒发出最近一组值）。`ch0_slot`/`ch1_slot` 与 `heartbeat_ms` 仅按需（变化时）发出。每行单独成行；禁止把多个字段拼进一行。按秒聚合的 1 Hz 流量对 115200 波特串口可忽略。
+
+### 6.4 编译期开关
+
+release 关闭、dev/test 打开：
+
+```c
+#ifdef LIGHT_TELEMETRY
+  /* 输出 T: 行 */
+#else
+  /* 不输出遥测行 */
+#endif
+```
+
+- 宏名：`LIGHT_TELEMETRY`（与 §4 保命清单 `CONFIG_RMT_TX_ISR_CACHE_SAFE` 同风格的编译期开关）。
+- 默认：**未定义 = 关闭**。release env（`platformio.ini` `[env:esp32c3]` 的发布变体）不定义；dev/test env（host `[env:native]`、上板调试构建）用 `-D LIGHT_TELEMETRY` 打开。
+- 关闭时遥测路径编译为死代码，零运行期开销；`glitch_count` / `drop_count` 不受此开关影响，**常驻**（STATUS 字段，release 保留）。
+
+### 6.5 与层 4 runner 的接口
+
+- `T:` 行由端口层输出（见 6.6），层 4 runner（`test-strategy.md` §1 层 4、§5 定位决策树）解析 `T:` 行做交叉断言，**不解析人读日志**。
+- runner 把 `T:` 行与 notify 时间线、场景脚本语义动作对拍：例如场景断言 `glitch_count==0`、`frame_ms≤16.7`、`ack_seq` 与协议层预期一致。
+- 原始串口日志仍整体落 `serial-raw.log`（`test-strategy.md` §6 证据留存），`T:` 行只是其上的结构化子集。
+
+### 6.6 归属与约束
+
+遥测输出属于 `firmware/ports/log.c`（端口层，可访问 IDF `esp_rom_printf` / ESP_LOG），**core 不含 stdio**（保持 §5.1「core 无 stdio」约束）：core 只向 `ports->log()` 回调报事件，`log.c` 在 `LIGHT_TELEMETRY` 下格式化为 `T:` 行；`glitch_count` 值从 core 的 `light_core_glitch_count()` 读取。
+
+---
+
+## 7. host 单测清单
 
 放 `tests/driver/`，与 `firmware/driver`、`firmware/effects` 同源编译（C99，无 IDF），用假 `light_ports_t` + 假时钟驱动。测试框架选型归 #26 / #28 定，本文只定用例与断言。
 
@@ -384,7 +457,7 @@ void frame_task(void *arg) {
 
 ---
 
-## 7. 上板实测项
+## 8. 上板实测项
 
 与 #23 的 11 项对齐：去掉 `{1,2}` 内存跨块（不采用，用默认 `{1,1}`），新增按需重绘/心跳行为；第 10 项改为「扇出+OE 门禁 + A/B 对照」。
 
@@ -405,7 +478,7 @@ B2 的硬件前提：数据线要能被 RX 通道采到（WS2812 输入高阻，
 
 ---
 
-## 8. 风险与未证实项
+## 9. 风险与未证实项
 
 | 风险 | 现状 | 处置 |
 |---|---|---|
