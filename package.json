@@ -14,6 +14,7 @@
     "build:logic": "npm run build --workspace @ble-light/logic",
     "typecheck": "tsc -p miniprogram/logic/tsconfig.build.json --noEmit && npm run typecheck:logic-src",
     "typecheck:logic-src": "tsc -p miniprogram/logic/tsconfig.json --noEmit",
+    "typecheck:transport": "tsc -p miniprogram/transport/tsconfig.json --noEmit",
     "lint": "node scripts/lint.mjs",
     "vitest": "vitest run",
     "logic-test": "vitest run dist",
@@ -27,6 +28,7 @@
     "site:preview": "node scripts/site-preview.mjs"
   },
   "devDependencies": {
+    "@types/node": "^20.19.43",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"
   }
