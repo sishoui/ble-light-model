@@ -14,7 +14,7 @@
 |---|---|---|---|---|---|---|
 | **1 确定性单测** | Node 逻辑（codec / 状态机 / 业务规则，vitest）+ C core（sched / frame / encode，host） | `vitest` + PlatformIO `test -e native` / Unity | `npm test` | 任意（Linux CI 可） | ✅ 每次 push | JUnit / `result.json` |
 | **2 页面层** | 单设备页在模拟器渲染与交互，注入 `FakeTransport` | `miniprogram-automator` 0.13.0 + 开发者工具（Windows GUI） | `npm run test:page` | Windows + 开发者工具 | ❌ | 截图 |
-| **3 协议 golden** | C / TS / Python 三端对同一份 `vectors.json` 逐字节一致（encode + feed） | 三端各自 runner | `npm test` | 任意 | ✅ 每次 push | 三端差异报告 |
+| **3 协议 golden** | C / TS / Python 三端对同一份 `vectors.json` 逐字节一致（encode + feed） | TS `verifyVectors` + C host runner（`tests/protocol/run-c.mjs` 编译 `firmware/proto`）+ Python `check.py`，由 `run-all.mjs` 编排 | `npm test` | 任意（C 需 cc/gcc/clang，Python 需 python3） | ✅ 每次 push | 三端差异报告 |
 | **4 PC 集成** | 影子跑：同一份 Node 逻辑经 PC 桥直连真机 C3 + 串口遥测交叉断言 | `PcBleTransport` + Python bleak 桥 + `T:` tag 解析（契约见 `driver.md` §6） | `npm run test:hw` | Windows + 真机 | ❌（发布前门禁） | 串口原始日志 / notify 时间线 / 失败帧 dump |
 | **5 真机冒烟** | automator 10 条（真机）+ driver 上板 B0–B9 + 4 项真实 BLE 栈人工项 | Android automator + 人工勾选清单 | `npm run test:smoke` | 真机 + 人 | ❌（发布前门禁） | 勾选清单 / 截图 / 录屏 |
 
@@ -81,7 +81,7 @@
 先看**哪条命令红 + 最底层证据**，不是按模块名猜：
 
 - **`npm test` 红** → 先看三端 golden 是否一致：
-  - 只有一端不一致 → 该端 codec 实现 bug（对照 `vectors.json` 该条）。
+  - 只有一端不一致 → 该端 codec 实现 bug（对照 `vectors.json` 该条）。C 端改 `firmware/proto/src/ble_proto.c`，TS 端改 `miniprogram/logic/src/codec.ts`（重建 dist），Python 端改 `tests/protocol/check.py`。
   - 三端一致但用例红 → vector 或 spec 错（先查 §8 前置项里已知的分片向量缺口）。
   - C core host 单测红（golden 绿）→ sched/frame/encode 内部，看 D1–D16 哪条。
 - **`test:page` 红** → 同一场景先跑 FakeTransport（层 1）：
@@ -130,6 +130,7 @@
 
 **前置（blocker，不做则层 3 自欺）**：
 - **~~`vectors.json` 分片向量缺口~~（已消除）**：~~`encode/fragment_20` 与 `feed/fragmented` 的 `chunks` 实际只有 1 个 19B 块（breath 帧整帧 < 20B），没真测到 20 字节分片/重组，与 `protocol.md` §13 描述不符。~~ 已由 #30 补齐真正的 `> 20B` 切片向量：`encode/fragment_60`（51B→20/20/11）、`feed/fragment_60_reassembly`（三块逐个喂入重组）、`feed/coalesced_multiframe`（两条 51B 帧粘包切两帧）、以及 19/20/21B 边界钉（`fragment_boundary_19/20/21`）。三端对拍已由 run-all.mjs 的 golden 自洽覆盖。
+- **~~层 3 三端对拍落地~~（已消除）**：~~`run-all.mjs` 只做 golden 自洽，C/Python 端是真执行但未实现，TS 端仅在产物存在时调用。~~ **已由 #36 落地为真三端对拍**：`firmware/proto/`（C99 codec）、`miniprogram/logic/src/codec.ts`（TS 镜像）、`tests/protocol/check.py`（Python 复算）三端各自独立实现 encode+feed，`run-all.mjs` 编排对同一 `vectors.json` 逐字节一致。C 端由 `tests/protocol/run-c.mjs` 用 cc/gcc/clang 编译 firmware/proto 后真对拍；Python 端在无 `BLE_BRIDGE_VENV` 时探测系统 `python3`/`python`；TS 端不可 skip（dist 未构建会明确失败）。CI `protocol-vectors` job 有 setup-python（python3）+ setup-node，干净 Linux 上三端全绿。
 - **~~固件测试遥测 tag 契约~~（已消除）**：~~`driver.md` 需加一节"测试遥测"——`T:` 前缀的机器可读行（如 `T:glitch_count=0`、`T:frame_ms=12.4`、`T:ack_seq=17`），层 4 runner 解析这些行做交叉断言而非人眼读日志；`T:` 流仅 dev/test 构建、release 编译期 `-D` 关；`glitch_count` / `drop_count` 常驻（已是 STATUS 字段，release 也留）。~~ **已由 issue #32 补齐，见 `driver.md` §6「测试遥测（T: 行）」**（字段集合、节流、`LIGHT_TELEMETRY` 编译开关、层 4 接口、ports 层归属）。
 
 **Not yet specified**（本票不决，留待实现后）：
