@@ -1,0 +1,11 @@
+{
+  "name": "ble-light-driver",
+  "version": "0.1.0",
+  "description": "BLE Light 驱动调度 core（纯 C99，driver.md §5）。host 单测经 PIO [env:native] 引用。",
+  "frameworks": "*",
+  "platforms": "*",
+  "build": {
+    "srcDir": "src",
+    "includeDir": "include"
+  }
+}
