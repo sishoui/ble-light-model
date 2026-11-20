@@ -1,0 +1,22 @@
+{
+  "description": "BLE Light 微信小程序（骨架）",
+  "projectname": "ble-light-model",
+  "appid": "wx0a46668333178576",
+  "compileType": "miniprogram",
+  "miniprogramRoot": "./",
+  "setting": {
+    "es6": true,
+    "enhance": true,
+    "typescript": true,
+    "packNpmManually": false,
+    "ignoreUploadUnusedFiles": true
+  },
+  "packOptions": {
+    "ignore": [
+      { "type": "folder", "value": "test" },
+      { "type": "folder", "value": "logic/src" },
+      { "type": "folder", "value": "logic/dist" }
+    ]
+  },
+  "libVersion": "3.5.0"
+}

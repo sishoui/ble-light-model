@@ -1,0 +1,14 @@
+{
+  "name": "@ble-light/logic",
+  "version": "0.1.0",
+  "private": true,
+  "description": "小程序逻辑层（codec / BleLink / DeviceController），小程序页面、Node 影子跑、vitest 共用同一份 dist",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist/"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json"
+  }
+}

@@ -1,0 +1,155 @@
+version: 1
+name: BLE Light
+description: 8 条 WS2812B 灯带固件 + 微信小程序 + 无手机回归
+
+specs:
+  - id: effects
+    title: 灯效与交互契约
+    path: docs/spec/effects.md
+    issue: 21
+  - id: protocol
+    title: BLE 协议 v1 契约
+    path: docs/spec/protocol.md
+    issue: 22
+  - id: driver
+    title: 驱动调度与刷新策略
+    path: docs/spec/driver.md
+    issue: 24
+  - id: miniprogram
+    title: 小程序可测性与无手机影子运行
+    path: docs/spec/miniprogram.md
+    issue: 25
+  - id: test-strategy
+    title: 测试金字塔与一条命令边界
+    path: docs/spec/test-strategy.md
+    issue: 26
+  - id: project-site
+    title: 项目管理系统规格
+    path: docs/spec/project-site.md
+    issue: 27
+
+modules:
+  - id: firmware/driver
+    name: 驱动调度
+    responsibility: 决定哪一条的哪一帧在哪个引脚发送、何时可偷懒
+    deps: [firmware/effects]
+    code_path: firmware/driver/
+  - id: firmware/effects
+    name: 灯效引擎
+    responsibility: 逐像素灯效算法，含 7 效果与场景持久化
+    deps: []
+    code_path: firmware/effects/
+  - id: app/logic
+    name: 小程序逻辑层
+    responsibility: DeviceController / BleLink / codec，逻辑与页面解耦
+    deps: [firmware/driver]
+    code_path: miniprogram/logic/
+  - id: app/page
+    name: 小程序页面层
+    responsibility: 单设备页渲染 DeviceController 快照
+    deps: [app/logic]
+    code_path: miniprogram/pages/
+  - id: test-harness
+    name: 无手机回归
+    responsibility: 层 1–5 的统一回归与证据
+    deps: [app/logic, firmware/driver]
+    code_path: tests/
+
+flows:
+  - id: ble-connect
+    title: BLE 连接
+    sequence: [scan, discover, connect, subscribe, hello, ready]
+  - id: set-effect
+    title: 点击下发灯效
+    sequence: [tap, optimistic, send, ack, rollback-on-nak]
+  - id: effect-refresh
+    title: 灯效刷新
+    sequence: [tick, compute-pixels, encode, schedule, transmit, heartbeat]
+
+milestones:
+  - id: spec
+    title: 规格定稿
+    order: 1
+  - id: implement
+    title: 三端实现
+    order: 2
+  - id: regression
+    title: 无手机回归
+    order: 3
+  - id: release
+    title: 发布
+    order: 4
+
+tasks:
+  - id: t1
+    milestone: spec
+    module: firmware/effects
+    title: 灯效契约定稿
+    status: done
+    issue: 21
+  - id: t2
+    milestone: spec
+    module: firmware/driver
+    title: 驱动调度定稿
+    status: done
+    issue: 24
+  - id: t3
+    milestone: spec
+    module: app/logic
+    title: 小程序可测性定稿
+    status: done
+    issue: 25
+  - id: t4
+    milestone: spec
+    module: test-harness
+    title: 测试金字塔与一条命令边界定稿
+    status: done
+    issue: 26
+  - id: t5
+    milestone: spec
+    module: app/page
+    title: 项目管理系统规格定稿
+    status: done
+    issue: 27
+  - id: t6
+    milestone: spec
+    module: test-harness
+    title: 仓库脚手架与 CI 基线
+    status: in_progress
+    issue: 28
+  - id: t7
+    milestone: implement
+    module: firmware/driver
+    title: C 驱动 + host 单测
+    status: todo
+    issue: null
+  - id: t8
+    milestone: implement
+    module: app/logic
+    title: 小程序逻辑 + codec
+    status: todo
+    issue: null
+  - id: t9
+    milestone: regression
+    module: test-harness
+    title: 三端 golden 对拍
+    status: todo
+    issue: null
+
+risks:
+  - id: r1
+    title: 30µs 补数窗口无法消除
+    severity: high
+    mitigation: 上板实测 + 心跳自愈 + glitch_count 遥测
+  - id: r2
+    title: 页面层无手机只能模拟器
+    severity: medium
+    mitigation: 注入 FakeTransport + 真机低频人工冒烟
+  - id: r3
+    title: 分片向量缺口
+    severity: medium
+    mitigation: 补 >20B 切片向量再对拍
+
+test_matrix:
+  rows: [firmware/driver, firmware/effects, app/logic, app/page, test-harness]
+  columns: [layer1, layer2, layer3, layer4, layer5]

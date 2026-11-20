@@ -1,0 +1,8 @@
+// 小程序项目配置（骨架）。devtools 用此文件打开 miniprogram/。
+// 注意：不含 AppSecret；AppID 公开可进仓库。
+{
+  "projectname": "ble-light-model",
+  "appid": "wx0a46668333178576",
+  "compileType": "miniprogram",
+  "miniprogramRoot": "./"
+}

@@ -1,0 +1,33 @@
+{
+  "name": "ble-light-model",
+  "version": "0.1.0",
+  "private": true,
+  "description": "8×100 WS2812B 灯带固件 + 原生微信小程序 + 无手机回归（monorepo）",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "workspaces": [
+    "miniprogram/logic"
+  ],
+  "scripts": {
+    "build:logic": "npm run build --workspace @ble-light/logic",
+    "typecheck": "tsc -p miniprogram/logic/tsconfig.build.json --noEmit && npm run typecheck:logic-src",
+    "typecheck:logic-src": "tsc -p miniprogram/logic/tsconfig.json --noEmit",
+    "lint": "node scripts/lint.mjs",
+    "vitest": "vitest run",
+    "logic-test": "vitest run dist",
+    "test:host": "node scripts/run-host-test.mjs",
+    "protocol-vectors": "node tests/protocol/run-all.mjs",
+    "test": "npm run build:logic && npm run vitest && npm run test:host && npm run protocol-vectors",
+    "test:page": "node tests/page/run.mjs",
+    "test:hw": "node tools/shadow/run-shadow.mjs",
+    "test:smoke": "node scripts/smoke-cli.mjs",
+    "site:build": "node scripts/gen-site.mjs",
+    "site:preview": "node scripts/site-preview.mjs"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}

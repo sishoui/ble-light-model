@@ -1,0 +1,30 @@
+# dependencies
+node_modules/
+
+# build artifacts (see test-strategy.md §6 & project-site.md §8)
+artifacts/
+dist/
+site/
+
+# C / firmware build output (PlatformIO)
+.pio/
+.pioenvs/
+.piolibdeps/
+
+# python venv / cache (bridge)
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+
+# editors / os
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# local env
+.env
+.env.*
+!.env.example
