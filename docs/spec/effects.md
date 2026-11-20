@@ -15,7 +15,7 @@
 | 灯带 strip | 8 条物理灯带之一，索引 `strip ∈ [0,7]`，每条固定 100 颗 WS2812B，像素索引 `i ∈ [0,99]`。8 条互相独立寻址。 |
 | 灯效 effect | 一段逐像素算法，由 `effect_id` 与一组参数确定。引擎在 C3 上跑。 |
 | 场景 scene | 8 条灯带当前「灯效 + 参数」的完整集合。MCU 为唯一真源。 |
-| 亮度 b | 某个灯效自带的明度参数（0–255），是该效果的参数之一，不是全局量。 |
+| 亮度 b / V | 某效果的明度。线上没有独立亮度字段，亮度体现在基色 RGB 的幅度里（见 protocol.md §6）；引擎内部把基色 RGB 转成 HSV 得到 `V`（0–255），供逐像素公式使用。不是全局量。 |
 | 相位 p | 动画的时间进度，取值 `[0,1)` 循环；由 `t_ms` 与速度换算而来。 |
 | 相位错开 | 周期类效果按灯带索引偏移 `strip/8` 个周期的默认观感行为。 |
 | 关灯 OFF | `effect_id = 0x00`，该条输出全黑并停止刷新。 |
@@ -29,7 +29,7 @@
 每条灯带持有：
 
 - `effect_id`（当前灯效，`0x00` 表示关灯）
-- `params[]`（当前灯效的参数，含该效果自己的亮度 `b`）
+- `params[]`（当前灯效的参数，含该效果的基色 `R,G,B`；亮度体现在 RGB 幅度里）
 - `last_on`（最近一次非关灯状态的快照：`effect_id + params`，仅用于「关→开」恢复）
 
 **没有**「单条亮度」独立字段：亮度随效果参数走（亮度是效果的一部分）。
@@ -57,25 +57,47 @@ NVS 写入策略：收到 ACK 后起 1 s 去抖计时，期间再收到命令则
 
 ## 3. 灯效总表
 
-所有参数单字节 `u8`，取值 `0–255`，除非另注。颜色用启发式 HSV：`h`（色相 0–255 映射 0–360°）、`s`（饱和 0–255）、明度由每效果自带的 `b` 给。
+本表是**线上编码**的参数布局，与 `docs/spec/protocol.md` §6 逐字段一致。颜色一律为逻辑 **R,G,B**（各 `0–255`），亮度体现在 RGB 幅度里，**没有独立的亮度字段**。多字节字段小端（见 `protocol.md` §1）。
 
-| id | 名称 | 参数（顺序即建议编码） | 字节数 |
+| id | 名称 | 参数（顺序即编码） | 字节数 |
 |---|---|---|---|
-| `0x00` | 关灯 OFF | — | 0 |
-| `0x01` | 静态 STATIC | `h, s, b` | 3 |
-| `0x02` | 呼吸 BREATH | `h, s, b, speed, min, max` | 6 |
-| `0x03` | 渐变 GRADIENT | `h1, s1, h2, s2, b, speed, dir` | 7 |
-| `0x04` | 彩虹 RAINBOW | `s, b, speed, dir` | 4 |
-| `0x05` | 流水 FLOW | `h, s, b, speed, tail, dir` | 6 |
-| `0x06` | 星闪 SPARKLE | `star_h, s, b, density, speed` | 5 |
+| `0x00` | 关灯 OFF | 无 | 0 |
+| `0x01` | 静态 STATIC | `R, G, B` | 3 |
+| `0x02` | 呼吸 BREATH | `R, G, B, period_ms(2, LE), min(1), max(1)` | 7 |
+| `0x03` | 渐变 GRADIENT | `R1,G1,B1, R2,G2,B2, period_ms(2, LE), direction(1)` | 10 |
+| `0x04` | 彩虹 RAINBOW | `speed(1), saturation(1), direction(1)` | 3 |
+| `0x05` | 流水 FLOW | `R,G,B, speed(1), length(1), direction(1)` | 7 |
+| `0x06` | 星闪 SPARKLE | `R,G,B, density(1), speed(1)` | 5 |
 
-约束：
+约束（与 `protocol.md` §6 相同口径）：
 
-- `dir`：`0` = 正向（`i` 增大方向），`1` = 反向。其它值按 `0` 处理。
+- `direction`：`0` = 正向（`i` 增大方向），`1` = 反向。其它值按 `0` 处理。
 - `min ≤ max`（呼吸），否则非法（协议回 `NAK 0x05`）。
-- `tail ≥ 1`（流水），`0` 按 `1` 处理。
+- `length ≥ 1`（流水），`0` 按 `1` 处理。
 - `0x07–0x7F` 预留；`0x80–0xFF` 调试。
 - 参数追加兼容：发送方 `param_len ≥ 期望字节数` 时，多余字节忽略；短于期望值非法（`NAK 0x04`）。语义以本表为准。
+
+### 3.1 HSV → RGB 换算
+
+线上按 **R,G,B** 传递（各 `0–255`）。引擎内部若用 HSV 推导（例如彩虹的色相环在固件内部生成），须先把基色 RGB 转成 HSV 再逐像素推导，换算规则与 `protocol.md` §6 一致：
+
+```
+function hsv_from_rgb(r, g, b):       # 均为 0..255，得到 h,s,v 0..255
+  R = r / 255; G = g / 255; B = b / 255
+  Cmax = max(R, G, B); Cmin = min(R, G, B)
+  d = Cmax - Cmin
+  v = Cmax
+  s = (Cmax == 0) ? 0 : d / Cmax
+  if   d == 0:       h = 0
+  elif Cmax == R:    h = 60 * (((G - B) / d) mod 6)
+  elif Cmax == G:    h = 60 * ((B - R) / d + 2)
+  else:              h = 60 * ((R - G) / d + 4)
+  return (round(h / 360 * 255), round(s * 255), round(v * 255))
+```
+
+- 线上拿到的是 **R,G,B**（或两色 RGB、或彩虹的 `saturation`）。引擎内部可再转 HSV 做 §6 推导。
+- §6.1 的 `hsv(h, s, v)` 仅作**引擎内部**的 HSV→RGB 输出，不是线上布局。
+- 无基色 RGB 的效果（如彩虹只带 `saturation`）由引擎内部生成色相环，明度用引擎内部固定值（见 §6.6）。
 
 ---
 
@@ -89,11 +111,11 @@ NVS 写入策略：收到 ACK 后起 1 s 去抖计时，期间再收到命令则
 
 ### 4.2 速度 → 周期
 
-`speed = s`，`r = s / 255`，`cps = cps_max × r`（每秒循环数）。
+本节是引擎内部的时间推导（与 §3 的线上字段名无关；线上速度/周期的具体字段见 §3，`speed` 或 `period_ms`）。此处统一记速度参数为 `speed`，`r = speed / 255`，`cps = cps_max × r`（每秒循环数）。
 
 `phase = frac(t_ms × cps / 1000)`
 
-| 效果 | `cps_max` | `s=255` 时 |
+| 效果 | `cps_max` | `speed=255` 时 |
 |---|---|---|
 | 呼吸 | 0.5 | 2 s 一个呼吸周期 |
 | 渐变（漂移） | 0.2 | 5 s 走完一次色相漂移 |
@@ -119,7 +141,8 @@ p = frac(phase + strip / 8)
 
 ## 5. 亮度口径
 
-- 输出为 `HSV(h, s, b)` 直接转 RGB；`b` 已经就是该效果的明度。
+- 线上颜色为逻辑 **R,G,B**，亮度体现在 RGB 幅度里，**没有独立的亮度字段**（见 `protocol.md` §6）。
+- 引擎内部把收到的基色 `R,G,B` 转成 HSV 的 `(h, s, V)` 供 §6 逐像素公式推导；`V`（来自基色幅度）即该效果的明度。
 - **没有**全局亮度乘子，**没有**电流/限流缩放（见 ADR-0001 与 §9）。
 - 关灯（`0x00`）输出 `(0,0,0)`。
 - 不做 gamma 校正（WS2812 线性亮度），是否加 gamma 属于观感调优，不在 v1。
@@ -128,7 +151,9 @@ p = frac(phase + strip / 8)
 
 ## 6. 逐像素公式
 
-记 `N = 100`，`i ∈ [0,99]`，`p` 为 §4 的相位（周期类按 §4.3 错开），`dir` 见 §3。
+记 `N = 100`，`i ∈ [0,99]`，`p` 为 §4 的相位（周期类按 §4.3 错开），`direction` 见 §3。
+
+本节是**引擎内部算法**：线上基色 `R,G,B`（§3）先按 §3.1 转成 HSV 的 `(h, s, V)`，再套用下面的逐像素公式；`hsv(h, s, v)` 是引擎内部的 HSV→RGB 输出，不是线上布局。
 
 ### 6.1 通用：HSV → RGB
 
@@ -158,50 +183,53 @@ for i in 0..99: out[i] = (0,0,0)
 
 ### 6.3 静态 `0x01`
 
+线上基色 `R,G,B` 原样输出（引擎内部 `(h,s,V)` 由 §3.1 转得）：
+
 ```
-out[i] = hsv(h, s, b)
+out[i] = hsv(h, s, V)          # 即原样输出基色 (R,G,B)
 ```
 
 ### 6.4 呼吸 `0x02`
 
+线上基色 `R,G,B` 由 §3.1 转成 `(h,s,V0)`；`min/max` 是亮度上的相对比例（0–255），不是绝对亮度。
+
 ```
 p       = frac(phase)                       # 不错开
 level   = min + (max - min) * (0.5 - 0.5*cos(2*PI*p))   # 0..255
-V       = b * level / 255
+V       = V0 * level / 255
 out[i] = hsv(h, s, V)
 ```
 
 - 波形为**正弦**。
-- `min/max` 是该效果亮度 `b` 上的相对比例（0–255），不是绝对亮度。
 
 ### 6.5 渐变 `0x03`
 
-沿条空间渐变（色 1 → 色 2），并整体色相缓慢漂移。
+线上两色 `R1,G1,B1` 与 `R2,G2,B2` 由 §3.1 分别转成 `(h1,s1,V1)`、`(h2,s2,V2)`。沿条空间做色相渐变（色 1 → 色 2），并整体色相缓慢漂移；亮度取基色 1 的幅度 `V1`（常量，保持原单一亮度语义）。
 
 ```
 p   = frac(phase + strip/8)
-u_i = (i / 99)                    if dir == 0
-u_i = 1 - (i / 99)                if dir == 1
+u_i = (i / 99)                    if direction == 0
+u_i = 1 - (i / 99)                if direction == 1
 delta = ((h2 - h1 + 128) mod 256) - 128     # 短弧：落在 (-128, 128]
-drift = p                                  if dir == 0
-drift = -p                                 if dir == 1
+drift = p                                  if direction == 0
+drift = -p                                 if direction == 1
 hue_i = frac((h1 + delta * u_i) / 255 + drift) * 255
 sat_i = s1 + (s2 - s1) * u_i
-out[i] = hsv(round(hue_i), round(sat_i), b)
+out[i] = hsv(round(hue_i), round(sat_i), V1)
 ```
 
 - 色相在 `h1→h2` 之间做**短弧**插值后整体旋转（避免两端硬接缝）。
-- `speed = 0` 时 `drift = 0`，得到静止的沿条渐变。
+- `period_ms = 0` 时 `drift = 0`，得到静止的沿条渐变。
 - `s1`/`s2` 线性插值。
 
 ### 6.6 彩虹 `0x04`
 
-整条铺满一个完整色环，随时间旋转。
+整条铺满一个完整色环，随时间旋转。线上只带 `speed, saturation, direction`（无基色 RGB）：`s` 取线上 `saturation` 字段，明度 `V` 用引擎内部固定值（全亮，无亮度字段）。
 
 ```
 p  = frac(phase + strip/8)
-t_i = frac(i / 99 + (dir == 0 ? p : -p))
-out[i] = hsv(round(t_i * 255), s, b)
+t_i = frac(i / 99 + (direction == 0 ? p : -p))
+out[i] = hsv(round(t_i * 255), s, V)
 ```
 
 - 色环首尾在色相上连续，`i=99 → i=0` 无可见接缝。
@@ -209,28 +237,27 @@ out[i] = hsv(round(t_i * 255), s, b)
 
 ### 6.7 流水 `0x05`
 
-一颗带尾巴的光点沿条移动，头出尾进、循环。
+一颗带尾巴的光点沿条移动，头出尾进、循环。线上基色 `R,G,B` 由 §3.1 转成 `(h,s,V0)`；`length`（§3 的线上字段名，算法内即尾长）是尾长（LED 颗数）。
 
 ```
 p        = frac(phase + strip/8)
 head     = p * 100                         # 头位置，LED 单位，[0,100)
 for i in 0..99:
-   d = (i - head)      mod 100   if dir == 0
-   d = (head - i)      mod 100   if dir == 1
-   if d < tail:
-       k = 1 - d / tail
-       V = b * k * k                       # 平方衰减
+   d = (i - head)      mod 100   if direction == 0
+   d = (head - i)      mod 100   if direction == 1
+   if d < length:
+       k = 1 - d / length
+       V = V0 * k * k                       # 平方衰减
    else:
        V = 0
    out[i] = hsv(h, s, round(V))
 ```
 
-- `tail` 是尾长（LED 颗数）。
 - `speed = 0` 时头停住，画面静止。
 
 ### 6.8 星闪 `0x06`
 
-黑底上随机点亮短寿命星点；**确定性伪随机**，同一时刻同一输入必得同一帧（可做 host 单测）。
+黑底上随机点亮短寿命星点；**确定性伪随机**，同一时刻同一输入必得同一帧（可做 host 单测）。线上基色 `R,G,B` 由 §3.1 转成 `(h,s,V0)`；星点色用该基色的 `h,s`，明度按 `V0` 衰减。
 
 ```
 r        = speed / 255
@@ -244,10 +271,10 @@ for i in 0..99:
    spark = (h32 / 2^32) < (density / 255) / 160
    if spark:
        k   = (1 - q) * (1 - q)             # 平方衰减
-       V   = b * k
+       V   = V0 * k
    else:
        V   = 0
-   out[i] = hsv(star_h, s, round(V))
+   out[i] = hsv(h, s, round(V))
 ```
 
 `hash32` 建议（三者混合，确定性）：
@@ -276,9 +303,9 @@ function hash32(i, slot, strip):
 「关→开」恢复顺序：
 
 1. 有 `last_on` → 恢复该快照；
-2. 无 `last_on` → `0x01` 静态，`h=0, s=0, b=128`（50% 白）。
+2. 无 `last_on` → `0x01` 静态，`R,G,B = (128,128,128)`（中灰，50% 亮度白）。
 
-非法参数（`min > max`、`tail = 0`、`param_len` 不足）由协议层拒绝，不进入引擎；引擎假定收到的参数已合法。
+非法参数（`min > max`、`length = 0`、`param_len` 不足）由协议层拒绝，不进入引擎；引擎假定收到的参数已合法。
 
 ---
 
@@ -320,7 +347,7 @@ function hash32(i, slot, strip):
 
 ## 9. 安全边界（明确不做的事）
 
-- **不做电流/电压估算，不做限流，不做满功率解锁。** 输出只受每效果亮度 `b` 约束。理由与后果见 `docs/adr/0001-no-current-limiting.md`。
+- **不做电流/电压估算，不做限流，不做满功率解锁。** 输出只受每效果基色幅度（亮度 `V`）约束。理由与后果见 `docs/adr/0001-no-current-limiting.md`。
 - 已知风险：8×100 颗全白理论约 48 A；若电源与线材不足，高亮长亮会过热或掉压。这属于用户明确接受的取舍，不由固件兜底。
 - 温度保护、欠压检测、故障上报不在本契约内。
 
