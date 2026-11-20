@@ -160,12 +160,40 @@ out.encode.push(encode("encode/param_len_255",
   buildFrame({ seq: 9, type: T.SET_EFFECT, flags: FLAG_ACK, strip_mask: 0xff, payload: Array.from({ length: 255 }, () => 0x5a) }),
   "maximum payload 255; frame length = 266"));
 
-// fragmented encode: same frame sliced into 20-byte BLE writes (no fragment header)
-{
-  const frame = buildFrame({ seq: 0x1234, type: T.SET_EFFECT, flags: FLAG_ACK, strip_mask: 0x03, payload: eff.BREATH });
+// helper: slice a whole frame into 20-byte BLE write chunks (no fragment header)
+const slice20 = (frame) => {
   const chunks = [];
   for (let i = 0; i < frame.length; i += 20) chunks.push(frame.slice(i, i + 20));
-  out.encode.push({ name: "encode/fragment_20", note: "frame sliced into 20-byte writes", bytes: frame, chunks });
+  return chunks;
+};
+
+// fragmented encode: same frame sliced into 20-byte writes (no fragment header)
+{
+  const frame = buildFrame({ seq: 0x1234, type: T.SET_EFFECT, flags: FLAG_ACK, strip_mask: 0x03, payload: eff.BREATH });
+  out.encode.push({ name: "encode/fragment_20", note: "frame sliced into 20-byte writes", bytes: frame, chunks: slice20(frame) });
+}
+
+// encode/fragment_60: 40B payload => whole frame 51B -> 20/20/11 (3 chunks).
+// Truly > 20B, so chunks reflect real multi-block fragmentation.
+{
+  const frame = buildFrame({
+    seq: 0x2000, type: T.SET_EFFECT, flags: FLAG_ACK, strip_mask: 0xff,
+    payload: Array.from({ length: 40 }, (_, i) => 0x40 + i),
+  });
+  out.encode.push({ name: "encode/fragment_60", note: "40B payload -> 51B frame sliced 20/20/11", bytes: frame, chunks: slice20(frame) });
+}
+
+// Boundary pins at 19/20/21B so encode.chunks and feed.chunks stay in lockstep:
+//  - 8B payload -> 19B frame (1 chunk, under 20)
+//  - 9B payload -> 20B frame (exactly 1 20B chunk)
+//  - 10B payload -> 21B frame (20/1, crosses the boundary)
+{
+  const p19 = buildFrame({ seq: 0x3000, type: T.SET_EFFECT, flags: FLAG_ACK, strip_mask: 0xff, payload: Array.from({ length: 8 }, (_, i) => i) });
+  const p20 = buildFrame({ seq: 0x3001, type: T.SET_EFFECT, flags: FLAG_ACK, strip_mask: 0xff, payload: Array.from({ length: 9 }, (_, i) => i) });
+  const p21 = buildFrame({ seq: 0x3002, type: T.SET_EFFECT, flags: FLAG_ACK, strip_mask: 0xff, payload: Array.from({ length: 10 }, (_, i) => i) });
+  out.encode.push({ name: "encode/fragment_boundary_19", note: "8B payload -> 19B frame, 1 chunk < 20B", bytes: p19, chunks: slice20(p19) });
+  out.encode.push({ name: "encode/fragment_boundary_20", note: "9B payload -> 20B frame, exactly 1 20B chunk", bytes: p20, chunks: slice20(p20) });
+  out.encode.push({ name: "encode/fragment_boundary_21", note: "10B payload -> 21B frame, 20/1 crosses boundary", bytes: p21, chunks: slice20(p21) });
 }
 
 // ================= FEED (chunk stream -> frames / naks / discard) =================
@@ -187,9 +215,7 @@ const frameOf = (f) => ({
 // 2 fragmented reassembly
 {
   const f = buildFrame({ seq: 0x0011, type: T.SET_EFFECT, flags: FLAG_ACK, strip_mask: 0x01, payload: eff.BREATH });
-  const chunks = [];
-  for (let i = 0; i < f.length; i += 20) chunks.push(f.slice(i, i + 20));
-  out.feed.push(feed("feed/fragmented", chunks, {
+  out.feed.push(feed("feed/fragmented", slice20(f), {
     frames: [frameOf(f)], naks: [], reply: "ACK seq=0x0011",
   }, "frame split across 20-byte writes, reassembled without header"));
 }
@@ -200,6 +226,32 @@ const frameOf = (f) => ({
   out.feed.push(feed("feed/coalesced", [[...a, ...b]], {
     frames: [frameOf(a), frameOf(b)], naks: [], reply: "ACK seq=0x0012, ACK seq=0x0013",
   }, "two frames glued in one buffer"));
+}
+// 3b feed/fragment_60_reassembly: a 51B frame (40B payload) split into 3 chunks (20/20/11)
+// fed packet-by-packet; receiver reassembles to the full frame across 20B boundaries.
+{
+  const f = buildFrame({ seq: 0x001f, type: T.SET_EFFECT, flags: FLAG_ACK, strip_mask: 0xff, payload: Array.from({ length: 40 }, (_, i) => 0x40 + i) });
+  out.feed.push(feed("feed/fragment_60_reassembly", slice20(f), {
+    frames: [frameOf(f)], naks: [], reply: "ACK seq=0x001f",
+  }, "51B frame fed as 3 20-byte writes -> reassembled, CRC passes"));
+}
+// 3c feed/coalesced_multiframe: two 51B frames glued byte-consecutively in one buffer.
+// The glued stream crosses 20B boundaries mid-frame; receiver must split two frames
+// and reassemble each across the glue, exercising >20B multi-block + stick-packet coalescing.
+{
+  const a = buildFrame({ seq: 0x0020, type: T.SET_EFFECT, flags: FLAG_ACK, strip_mask: 0xff, payload: Array.from({ length: 40 }, (_, i) => 0x40 + i) });
+  const b = buildFrame({ seq: 0x0021, type: T.SET_EFFECT, flags: FLAG_ACK, strip_mask: 0xff, payload: Array.from({ length: 40 }, (_, j) => 0x80 + j) });
+  out.feed.push(feed("feed/coalesced_multiframe", [[...a, ...b]], {
+    frames: [frameOf(a), frameOf(b)], naks: [], reply: "ACK seq=0x0020, ACK seq=0x0021",
+  }, "two 51B frames glued in one buffer, split + reassembled across 20B boundaries"));
+}
+// 3d feed/fragment_boundary_21: a 21B frame (10B payload) split 20/1 across the boundary,
+// fed packet-by-packet -> reassembled. Mirrors encode/fragment_boundary_21.
+{
+  const f = buildFrame({ seq: 0x0022, type: T.SET_EFFECT, flags: FLAG_ACK, strip_mask: 0xff, payload: Array.from({ length: 10 }, (_, i) => i) });
+  out.feed.push(feed("feed/fragment_boundary_21", slice20(f), {
+    frames: [frameOf(f)], naks: [], reply: "ACK seq=0x0022",
+  }, "21B frame split 20/1 across boundary, reassembled"));
 }
 // 4 CRC error -> NAK CRC
 {

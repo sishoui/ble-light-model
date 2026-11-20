@@ -269,15 +269,22 @@ v1 的向前兼容手段（旧固件遇到新东西时**忽略而非崩溃**）�
 | encode/status | 28B | `aa 55 01 01 00 09 00 00 11 10 00 00 00 00 00 00 00 00 00 01 00 02 00 03 00 00 7f 1e` | STATUS 17B |
 | encode/scene | 66B | `aa 55 01 02 00 0b 00 00 37 08 00 00 01 03 ff 40 20 02 07 02 ff 00 00 e8 03 00 ff 03 0a 03 ff 00 00 00 00 ff e8 03 00 04 03 04 ff ff 00 05 07 05 ff 00 00 80 10 00 06 05 06 ff ff ff 20 40 00 00 98 89` | SCENE 全量回读，8 条 |
 | encode/param_len_255 | 266B | `aa 55 01 09 00 02 01 ff ff` + 255×`5a` + crc `38 44` | 最大 payload 255，整帧 266 |
-| encode/fragment_20 | 19B | `aa 55 01 34 12 02 01 03 08 02 ff 00 00 e8 03 00 ff 1d f0` | 与 breath 同帧，另含按 20 字节切片的 `chunks` |
+| encode/fragment_20 | 19B | `aa 55 01 34 12 02 01 03 08 02 ff 00 00 e8 03 00 ff 1d f0` | 与 breath 同帧，另含按 20 字节切片的 `chunks`（19B < 20，单块） |
+| encode/fragment_60 | 51B | `aa 55 01 00 20 02 01 ff 28 40 41 42 43 44 45 46 47 48 49 4a 4b 4c 4d 4e 4f 50 51 52 53 54 55 56 57 58 59 5a 5b 5c 5d 5e 5f 60 61 62 63 64 65 66 67 0b 62` | 40B payload → 整帧 51B，`chunks` 按 20B 切为 **20/20/11 三块**（真实多块拆分） |
+| encode/fragment_boundary_19 | 19B | `aa 55 01 00 30 02 01 ff 08 00 01 02 03 04 05 06 07 08 67` | 8B payload → 19B，1 块（<20） |
+| encode/fragment_boundary_20 | 20B | `aa 55 01 01 30 02 01 ff 09 00 01 02 03 04 05 06 07 08 f0 54` | 9B payload → 20B，恰 1 个 20B 块 |
+| encode/fragment_boundary_21 | 21B | `aa 55 01 02 30 02 01 ff 0a 00 01 02 03 04 05 06 07 08 09 ef eb` | 10B payload → 21B，`chunks` 20/1 跨 20B 边界 |
 
 ### 13.2 feed（字节流 → 帧 / NAK / 丢弃）
 
 | 向量 | 输入（chunks） | 期望 |
 |---|---|---|
 | feed/normal | `aa 55 01 10 00 02 01 01 04 01 ff ff ff 69 c7` | frames=1；ACK seq=0x0010 |
-| feed/fragmented | `aa 55 01 11 00 02 01 01 08 02 ff 00 00 e8 03 00 ff ee a9` | frames=1；ACK seq=0x0011（20B 切片重组） |
+| feed/fragmented | `aa 55 01 11 00 02 01 01 08 02 ff 00 00 e8 03 00 ff ee a9` | frames=1；ACK seq=0x0011（19B 帧 < 20，单块） |
 | feed/coalesced | `aa 55 01 12 00 02 01 01 00 02 31 aa 55 01 13 00 02 01 01 04 01 ff ff ff a6 76` | frames=2；ACK 0x0012, ACK 0x0013 |
+| feed/fragment_60_reassembly | `aa 55 01 1f 00 02 01 ff 28 40 41 42 43 44 45 46 47 48 49 4a 4b 4c 4d 4e 4f 50 51 52 53 54 55 56 57 58 59 5a 5b 5c 5d 5e 5f 60 61 62 63 64 65 66 67 2b 06` | frames=1；ACK seq=0x001f（51B 帧按 **20/20/11 三块**逐个喂入重组） |
+| feed/fragment_boundary_21 | `aa 55 01 22 00 02 01 ff 0a 00 01 02 03 04 05 06 07 08 09 65 7e` | frames=1；ACK seq=0x0022（21B 帧 20/1 跨边界喂入重组） |
+| feed/coalesced_multiframe | `aa 55 01 20 00 02 01 ff 28 40 41 42 43 44 45 46 47 48 49 4a 4b 4c 4d 4e 4f 50 51 52 53 54 55 56 57 58 59 5a 5b 5c 5d 5e 5f 60 61 62 63 64 65 66 67 a4 08` + `aa 55 01 21 00 02 01 ff 28 80 81 82 83 84 85 86 87 88 89 8a 8b 8c 8d 8e 8f 90 91 92 93 94 95 96 97 98 99 9a 9b 9c 9d 9e 9f a0 a1 a2 a3 a4 a5 a6 a7 98 71` | frames=2；ACK 0x0020, ACK 0x0021（两条 51B 帧连段喂入，粘包切两帧，跨 20B 边界） |
 | feed/crc_error | `aa 55 01 14 00 02 01 01 04 01 ff ff ff 5c 95` | NAK `aa 55 01 14 00 08 00 00 03 14 00 01 9e c6` |
 | feed/unknown_type | `aa 55 01 15 00 7f 00 01 00 80 b5` | NAK `aa 55 01 15 00 08 00 00 03 15 00 02 ee 2a` |
 | feed/unknown_effect | `aa 55 01 16 00 02 01 01 03 7f 00 00 fd 67` | NAK `aa 55 01 16 00 08 00 00 03 16 00 03 db 4e` |
@@ -290,7 +297,7 @@ v1 的向前兼容手段（旧固件遇到新东西时**忽略而非崩溃**）�
 | feed/get_scene | `aa 55 01 1d 00 0a 00 00 00 c3 75` | frames=1；生成 SCENE |
 | feed/bad_param | `aa 55 01 1e 00 02 01 01 08 02 ff 00 00 64 00 80 20 d3 d8` | NAK `aa 55 01 1e 00 08 00 00 03 1e 00 05 43 ae` |
 
-> 覆盖：正常帧、分片、粘包、CRC 错、seq 重复、未知 type、未知灯效、param_len 过长/过短、版本错、半帧丢弃、非法参数、GET_STATUS/GET_SCENE 应答。
+> 覆盖：正常帧、分片（含 51B 多块重组、21B 跨边界）、粘包（含两条 >20B 帧连段切两帧）、CRC 错、seq 重复、未知 type、未知灯效、param_len 过长/过短、版本错、半帧丢弃、非法参数、GET_STATUS/GET_SCENE 应答。
 
 ---
 
