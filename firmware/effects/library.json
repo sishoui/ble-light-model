@@ -1,0 +1,11 @@
+{
+  "name": "ble-light-effects",
+  "version": "0.1.0",
+  "description": "BLE Light 灯效引擎（纯 C99，effects.md §6 公式整数实现）。host 单测经 PIO [env:native] 引用。",
+  "frameworks": "*",
+  "platforms": "*",
+  "build": {
+    "srcDir": "src",
+    "includeDir": "include"
+  }
+}
