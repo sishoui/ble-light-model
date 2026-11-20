@@ -1,6 +1,6 @@
 // C core host 单测占位（firmware/[env:native]，Unity）。
 // 骨架阶段只验证脚手架（Unity 编译 + 跑一个真断言）通，不是真业务用例。
-// 执行阶段在此目录按 docs/spec/driver.md §6 落地 D1–D16。
+// 执行阶段在此目录按 docs/spec/driver.md §7 落地 D1–D16。
 
 #include <unity.h>
 

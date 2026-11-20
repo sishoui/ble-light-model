@@ -15,7 +15,7 @@
 | **1 确定性单测** | Node 逻辑（codec / 状态机 / 业务规则，vitest）+ C core（sched / frame / encode，host） | `vitest` + PlatformIO `test -e native` / Unity | `npm test` | 任意（Linux CI 可） | ✅ 每次 push | JUnit / `result.json` |
 | **2 页面层** | 单设备页在模拟器渲染与交互，注入 `FakeTransport` | `miniprogram-automator` 0.13.0 + 开发者工具（Windows GUI） | `npm run test:page` | Windows + 开发者工具 | ❌ | 截图 |
 | **3 协议 golden** | C / TS / Python 三端对同一份 `vectors.json` 逐字节一致（encode + feed） | 三端各自 runner | `npm test` | 任意 | ✅ 每次 push | 三端差异报告 |
-| **4 PC 集成** | 影子跑：同一份 Node 逻辑经 PC 桥直连真机 C3 + 串口遥测交叉断言 | `PcBleTransport` + Python bleak 桥 + `T:` tag 解析 | `npm run test:hw` | Windows + 真机 | ❌（发布前门禁） | 串口原始日志 / notify 时间线 / 失败帧 dump |
+| **4 PC 集成** | 影子跑：同一份 Node 逻辑经 PC 桥直连真机 C3 + 串口遥测交叉断言 | `PcBleTransport` + Python bleak 桥 + `T:` tag 解析（契约见 `driver.md` §6） | `npm run test:hw` | Windows + 真机 | ❌（发布前门禁） | 串口原始日志 / notify 时间线 / 失败帧 dump |
 | **5 真机冒烟** | automator 10 条（真机）+ driver 上板 B0–B9 + 4 项真实 BLE 栈人工项 | Android automator + 人工勾选清单 | `npm run test:smoke` | 真机 + 人 | ❌（发布前门禁） | 勾选清单 / 截图 / 录屏 |
 
 **CI 与本地门槛分界**：每次 push 必须绿的是层 1 + 层 3 + 静态检查（`build:logic` → `tsc --noEmit` → logic 目录 grep/ESLint 约束 → `vitest run dist`）。层 2 / 4 / 5 是"硬件在环"门槛，只做**发布前**与人工时机，不进 Linux CI。层 2 单独一条命令，因为依赖 Windows + 微信开发者工具 + 登录；层 4 单独一条命令，因为依赖真机 + 桥；层 5 单独一条命令，因为要人。
@@ -122,7 +122,7 @@
 - 层 5 人工冒烟签字（硬门槛）。
 - 层 2 只要**改过 `pages/` 就必须本地跑绿**，但**不进发布证据**；未改页面则不设门槛。
 
-冒烟范围分界（不复述各 spec）：automator 10 条（真机，覆盖交互逻辑，见 `miniprogram.md` §9.3）+ driver 上板 B0–B9（覆盖固件时序/电气，见 `driver.md` §7）+ **4 项真实 BLE 栈人工项**（权限弹窗 / 后台与锁屏 / 分片 / notify 时序，automator 测不到的部分）。
+冒烟范围分界（不复述各 spec）：automator 10 条（真机，覆盖交互逻辑，见 `miniprogram.md` §9.3）+ driver 上板 B0–B9（覆盖固件时序/电气，见 `driver.md` §8）+ **4 项真实 BLE 栈人工项**（权限弹窗 / 后台与锁屏 / 分片 / notify 时序，automator 测不到的部分）。
 
 ---
 
@@ -130,7 +130,7 @@
 
 **前置（blocker，不做则层 3 自欺）**：
 - **`vectors.json` 分片向量缺口**：`encode/fragment_20` 与 `feed/fragmented` 的 `chunks` 实际只有 1 个 19B 块（breath 帧整帧 < 20B），**没真测到 20 字节分片/重组**，与 `protocol.md` §13 描述不符。需补至少一条真正 `> 20B` 的切片向量（分多块 + 粘包重组），再让三端对拍。
-- **固件测试遥测 tag 契约**：`driver.md` 需加一节"测试遥测"——`T:` 前缀的机器可读行（如 `T:glitch_count=0`、`T:frame_ms=12.4`、`T:ack_seq=17`），层 4 runner 解析这些行做交叉断言而非人眼读日志；`T:` 流仅 dev/test 构建、release 编译期 `-D` 关；`glitch_count` / `drop_count` 常驻（已是 STATUS 字段，release 也留）。
+- **固件测试遥测 tag 契约**：~~`driver.md` 需加一节"测试遥测"——`T:` 前缀的机器可读行（如 `T:glitch_count=0`、`T:frame_ms=12.4`、`T:ack_seq=17`），层 4 runner 解析这些行做交叉断言而非人眼读日志；`T:` 流仅 dev/test 构建、release 编译期 `-D` 关；`glitch_count` / `drop_count` 常驻（已是 STATUS 字段，release 也留）。~~ **已由 issue #32 补齐，见 `driver.md` §6「测试遥测（T: 行）」**（字段集合、节流、`LIGHT_TELEMETRY` 编译开关、层 4 接口、ports 层归属）。
 
 **Not yet specified**（本票不决，留待实现后）：
 - 覆盖率数字目标（层 1 的 branch/statement 阈值）——等实现出来再谈。
