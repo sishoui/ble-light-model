@@ -396,14 +396,15 @@ export function verifyVectors(vectors: unknown): true | string {
       for (let i = 0; i < flat.length; i++) {
         if (flat[i] !== e.bytes[i]) return `${name}: chunks[${i}] ${flat[i]} != bytes ${e.bytes[i]}`;
       }
-      for (const c of e.chunks) {
-        if (c.length > 20) return `${name}: 切片块 ${c.length} > 20`;
+      for (let ci = 0; ci < e.chunks.length; ci++) {
+        const c = e.chunks[ci];
+        if (c.length === 0 || c.length > 20) return `${name}: 切片块 ${c.length} 不在 1..20`;
+        if (ci + 1 < e.chunks.length && c.length !== 20) return `${name}: 非末切片块 ${c.length} != 20`;
       }
-      if (e.chunks[e.chunks.length - 1].length === 0) return `${name}: 有空切片块`;
     }
-    // 复算：从 bytes 反推命令并重新 encode 逐字节比对
+    // 复算：从 bytes 反推命令并重新 encode 逐字节比对（全量覆盖 encode 向量）
     const rep = reencodeFromBytes(e.bytes);
-    if (rep === null) continue; // 语义不明（如 0x5a 填充）只做自洽
+    if (rep === null) return `${name}: 无法从整帧反推 encode 输入`;
     const got = encode(rep.cmd);
     if (got.length !== e.bytes.length) return `${name}: encode 长度 ${got.length} != ${e.bytes.length}`;
     for (let i = 0; i < got.length; i++) {
@@ -485,6 +486,12 @@ export function verifyVectors(vectors: unknown): true | string {
           if (!frames.some((fr) => fr.frame.seq === ack.seq)) {
             return `${name}: ACK seq ${ack.seq} 不在已解析帧 seq 内`;
           }
+          // ACK 帧字节必须与独立组帧一致
+          const expBytes = encodeAck(ack.seq);
+          if (expBytes.length !== ack.bytes.length) return `${name}: ACK seq ${ack.seq} 长度不符`;
+          for (let k = 0; k < expBytes.length; k++) {
+            if (expBytes[k] !== ack.bytes[k]) return `${name}: ACK seq ${ack.seq} byte[${k}] 不符`;
+          }
         }
       } else if (replyStr.startsWith("STATUS")) {
         if (statusEvts.length < 1) return `${name}: 期望 STATUS 应答，未生成`;
@@ -496,15 +503,12 @@ export function verifyVectors(vectors: unknown): true | string {
   return true;
 }
 
-/** 从期望整帧字节反推可复算的 EncodeCommand；语义不明（如 0x5a 填充）返回 null */
+/** 从期望整帧字节反推可复算的 EncodeCommand；结构不合法返回 null */
 function reencodeFromBytes(bytes: number[]): { cmd: EncodeCommand } | null {
   if (bytes.length < 11) return null; // 9 头 + 2 crc
   const paramLen = bytes[8];
+  if (bytes.length !== 9 + paramLen + 2) return null;
   const payload = bytes.slice(9, 9 + paramLen);
-  if (paramLen > 0) {
-    // 跳过全填充（0x5a）等无法还原语义的向量，但仍校验 CRC/长度自洽
-    if (payload.every((b) => b === payload[0])) return null;
-  }
   const seq = bytes[3] | (bytes[4] << 8);
   const type = bytes[5];
   const flags = bytes[6];

@@ -1,0 +1,11 @@
+{
+  "name": "ble-light-proto",
+  "version": "0.1.0",
+  "description": "BLE 协议 v1 平台无关 codec（纯 C99，protocol.md §12）。host 单测经 PIO [env:native] 引用。",
+  "frameworks": "*",
+  "platforms": "*",
+  "build": {
+    "srcDir": "src",
+    "includeDir": "include"
+  }
+}
