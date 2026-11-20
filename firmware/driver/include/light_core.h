@@ -101,6 +101,18 @@ typedef enum {
  *   static light_core_storage_t g_core_store;
  *   light_core_init((light_core_t *)&g_core_store, &ports, now_ms);
  */
+/* 静态存储大小（light_core_storage_t）按 struct light_core 实际组成放大到 ~40 KB：
+ *   sym[2][2][2400] × 4B    = 38400  双通道 × 双缓冲 symbol（最大头，见 light_core_internal.h）
+ *   rgb_scratch[300]        =   300  逐帧渲染目标
+ *   cfg[8] × 12B            =    96  每槽位配置
+ *   due[2][4] × 4B          =    32  槽位下次发送时刻
+ *   last_submit_us[8] × 4B  =    32  每槽位上次提交时刻
+ *   其余计数/位图/指针/状态  ≈  500+  含 glitch/drop、busy 簿记、off_pending、last_poll/tele 等
+ *   ---
+ *   小计                          ~38910
+ *   对齐填充 + 余量（覆盖 32/64 位指针宽度差异） ≈ 2050
+ * 取整到 40960。core 自身不 malloc；调用方声明一个此大小的 static 存储再强转成 light_core_t*。
+ */
 #define LIGHT_CORE_STORAGE_BYTES 40960u
 
 typedef union {

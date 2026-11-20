@@ -5,32 +5,14 @@
 
 #include "light_core.h"
 #include "light_core_internal.h"
+#include "telemetry.h"
 
 /* Glitch counting lives here (frame-start lateness); scheduler decides when to call it. */
 void frame_note_glitch(struct light_core *c)
 {
     if (c->glitch_count < 0xFFFFu) c->glitch_count++;
 #ifdef LIGHT_TELEMETRY
-    {
-        char val[12];
-        unsigned v = c->glitch_count;
-        char tmp[11]; int i = 0;
-        if (v == 0u) { tmp[i++] = '0'; }
-        while (v > 0u) { tmp[i++] = (char)('0' + (int)(v % 10u)); v /= 10u; }
-        int j = 0;
-        while (i > 0) val[j++] = tmp[--i];
-        val[j] = 0;
-        char line[40];
-        size_t n = 0;
-        line[n++] = 'T'; line[n++] = ':';
-        const char *key = "glitch_count";
-        while (*key) line[n++] = *key++;
-        line[n++] = '=';
-        const char *s = val;
-        while (*s) line[n++] = *s++;
-        line[n] = 0;
-        c->ports->log(LIGHT_LOG_INFO, line);
-    }
+    telemetry_emit_t_u32(c->ports, "glitch_count", c->glitch_count);
 #endif
 }
 
