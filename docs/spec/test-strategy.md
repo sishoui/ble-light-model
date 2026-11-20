@@ -41,6 +41,8 @@
 
 **无硬件的优雅跳过**：`npm test` 根本不碰硬件，不存在跳过。只有 `test:page` / `test:hw` 会先探测环境（开发者工具端口 / 桥与设备可达），不可达时打印 `SKIPPED: no device on bridge <X>` 之类一行明确结论并退 `2`。`--require-hw` 把 `2` 升级为失败，供发布前门禁用。
 
+**层 1 C host 单测不跳过（fail-closed）**：`test:host` 跑的是 `pio test -e native`，纯软件、不需要硬件。缺 PlatformIO 属「缺工具链」，不是「硬件不可用」，因此 `test:host` 在缺工具链时打印 `NOT EXECUTED` 并退 `2`（诚实：未执行 ≠ 成功），**在 CI（`CI=true`）或 `--require-host` / `REQUIRE_HOST=1` 下退 `1`（红）**，杜绝「没跑却绿」。runner 探测 `pio` / `platformio` / `python -m platformio` 三种调用方式，覆盖「pip 装了但脚本不在 PATH」这一常见情形。
+
 **统一 `result.json`**：每个 runner 无论通过/跳过/失败都落一份 `result.json`（层、命令、commit、环境、通过数/失败数/跳过数、各场景耗时、实测均值），上层编排与发布门禁读它，不 grep 人类日志。
 
 ---
