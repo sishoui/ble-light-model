@@ -12,13 +12,13 @@
 
 ```text
 bridge/
-  ble_bridge/__main__.py      # 桥入口（执行阶段落地）
+  ble_bridge/__main__.py      # 桥入口（未实现：仅打印 ready 占位）
   requirements.txt            # bleak==3.1.*
 ```
 
 ## 状态
 
-骨架阶段：仅版本与契约就位；桥代码在执行阶段落地（issue #28 之后的执行 ticket）。
+未实现：桥代码仍是占位（仅打印 ready）；契约见 `docs/spec/miniprogram.md` §5，待后续票实现。
 
 ## secrets
 

@@ -5,8 +5,7 @@
 ```text
 tests/
   logic/          # 层 1 Node 单测（vitest，测 @ble-light/logic 的 dist）
-  driver/         # 层 1 C core host 单测（firmware/[env:native]，D1–D16）
-  scenarios/      # 共享场景脚本（tests/scenarios/*.json，三 runner 共用）
+  scenarios/      # 共享场景脚本（tests/scenarios/*.json，三 runner 共用，未落地）
   shadow/         # 层 4 Node 影子跑（PcBleTransport + 真桥 + 真 C3）
   page/           # 层 2 miniprogram-automator（开发者工具模拟器，不进 Linux CI）
   protocol/       # 层 3 三端 golden（vectors.json + generate_vectors.mjs + run-all.mjs）
@@ -26,4 +25,6 @@ tests/
 
 ## 状态
 
-骨架阶段：`tests/logic/placeholder.test.ts` 与 `tests/protocol/run-all.mjs`（golden 自洽校验）可绿；其余目录在执行阶段落地。
+- 层 1：`tests/logic/` 30 个 vitest 用例全绿；C core host 单测（D1–D16 + 灯效 + 遥测，30 用例）在 `firmware/test/`，走 `pio test -e native`（**不在 `tests/driver/`**）。
+- 层 3：`tests/protocol/` 三端对拍（`vectors.json` 20 encode / 17 feed，TS/C/Python 逐字节一致）全绿。
+- 层 2/4/5（`page/` `shadow/` 与共享 `scenarios/`）尚未落地，见 `docs/handover.md`。

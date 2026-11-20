@@ -1,5 +1,5 @@
 {
-  "description": "BLE Light 微信小程序（骨架）",
+  "description": "BLE Light 微信小程序",
   "projectname": "ble-light-model",
   "appid": "wx0a46668333178576",
   "compileType": "miniprogram",

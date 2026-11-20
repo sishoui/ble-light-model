@@ -4,4 +4,4 @@
 
 ## 状态
 
-骨架阶段：目录就位；runner 在执行阶段落地。
+未实现：目录就位；automator runner 尚未实现（层 2，Windows + 开发者工具）。
