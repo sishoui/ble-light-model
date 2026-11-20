@@ -316,3 +316,24 @@ v1 的向前兼容手段（旧固件遇到新东西时**忽略而非崩溃**）�
 - [ ] `GET_SCENE` 能取回 8 条完整 `effect_id + params`；`SCENE` 可被 C3 自身与三端解析。
 - [ ] 需 ACK 命令 500 ms 超时、最多重传 3 次；NAK 不自动重试。
 - [ ] 收到 ACK 后 1 s 去抖写 NVS；重启恢复；缺失/版本错全关。
+
+---
+
+## 16. GATT 承载
+
+帧在 BLE 上的落点（客户端实现见 `docs/spec/miniprogram.md` §4）：
+
+| 项 | 值 |
+|---|---|
+| 服务 UUID | `6E400001-B5A3-F393-E0A9-E50E24DCCA9E` |
+| CMD 特征（客户端 → C3） | `6E400002-B5A3-F393-E0A9-E50E24DCCA9E`，属性 `write` + `writeWithoutResponse` |
+| RSP 特征（C3 → 客户端） | `6E400003-B5A3-F393-E0A9-E50E24DCCA9E`，属性 `notify`，必须有 CCCD `0x2902` |
+| 广播名 | `BLE-Light-` + MAC 后 4 位（大写 hex） |
+| 广播内容 | connectable undirected；带服务 UUID；断连后重新广播 |
+
+- 客户端发现服务后必须校验两个特征都存在；缺失按致命错误处理，不降级。
+- 写：整帧按 §3 切片后逐包写入 CMD。不要求 write-with-response（协议 ACK 兜底），平台可用默认写类型；每次写的数据长度不超过（协商 MTU − 3）。
+- 通知：C3 只从 RSP 发；客户端必须先完成订阅再开始写。HELLO 可能在 BLE 连接后立刻到达，订阅必须发生在连接流程内，不能等页面加载完。
+- MTU：仅作传输上限，C3 配置 `CONFIG_BT_NIMBLE_ATT_PREFERRED_MTU`（建议 256），Windows 中心自动协商；**客户端不主动 `setBLEMTU`**（§3）。
+- CCCD 兼容：容忍 Windows 重连后写 `0x0080`；重连后重新订阅（NimBLE 已知问题），不依赖上次订阅状态。
+- 调试期改动 GATT 布局后，Windows 侧需删除/重新配对设备以清服务缓存。

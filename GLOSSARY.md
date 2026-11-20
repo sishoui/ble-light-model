@@ -43,3 +43,23 @@ _Avoid_: 保活、重刷
 **总开关**：
 同时控制 8 条的开关，只管「开/关」，不改变亮度。
 _Avoid_: 主亮度、master brightness
+
+**Transport**：
+逻辑层与 BLE 链路之间的字节通道：扫描、连接、单包写、MTU、通知、断连。三种实现（小程序、PC 桥、测试）共享同一契约。
+_Avoid_: adapter、driver、BluetoothService
+
+**BleLink**：
+在 Transport 之上维持连接状态与协议会话的层：连接状态机、命令与回执、分片、写串行、超时与错误映射。不解释灯效语义。
+_Avoid_: connection manager、link service
+
+**DeviceController**：
+设备页背后的逻辑：8 条灯带状态、总开关、场景回读、乐观更新与回滚、错误文案。页面只渲染它的快照。
+_Avoid_: page logic、store
+
+**桥（bridge）**：
+影子跑中承载 PC 蓝牙收发的本地通道；只做电台，不碰帧与灯效。
+_Avoid_: broker、gateway
+
+**影子跑（shadow run）**：
+同一份小程序逻辑在 Node 里经 PC 蓝牙直连真机 C3 的脱机回归。
+_Avoid_: headless、simulation
