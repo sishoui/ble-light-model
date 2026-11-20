@@ -9,6 +9,7 @@
 
 #include "light_core.h"
 #include "light_core_internal.h"
+#include "telemetry.h"
 
 #include <string.h>
 
@@ -34,38 +35,14 @@ static uint32_t period_us_of(uint8_t kind)
 }
 
 /* ---------- Telemetry T: lines (spec 6). Core has no stdio/float; integers are
- * formatted here and passed to ports->log (spec 6.6). ---------- */
+ * formatted by the shared telemetry.c helper and passed to ports->log (spec 6.6).
+ * ---------- */
 
 #ifdef LIGHT_TELEMETRY
 
-static void u32_to_dec(char *out, uint32_t v)
-{
-    char tmp[11];
-    int i = 0;
-    if (v == 0u) { out[0] = '0'; out[1] = 0; return; }
-    while (v > 0u) { tmp[i++] = (char)('0' + (int)(v % 10u)); v /= 10u; }
-    int j = 0;
-    while (i > 0) out[j++] = tmp[--i];
-    out[j] = 0;
-}
-
-static void emit_tline(const struct light_core *c, const char *key, const char *val)
-{
-    char line[48];
-    size_t n = 0;
-    line[n++] = 'T'; line[n++] = ':';
-    while (*key) line[n++] = *key++;
-    line[n++] = '=';
-    while (*val) line[n++] = *val++;
-    line[n] = 0;
-    c->ports->log(LIGHT_LOG_INFO, line);
-}
-
 static void emit_t_u32(const struct light_core *c, const char *key, uint32_t v)
 {
-    char val[12];
-    u32_to_dec(val, v);
-    emit_tline(c, key, val);
+    telemetry_emit_t_u32(c->ports, key, v);
 }
 
 static void emit_strip_state(struct light_core *c)

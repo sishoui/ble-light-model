@@ -10,6 +10,7 @@
 
 #include "light_core.h"
 #include "effect_engine.h"
+#include "telemetry.h"
 
 void run_effects_tests(void); /* provided by test_effects.c (single main lives here) */
 
@@ -847,6 +848,34 @@ static void test_telemetry_lines(void)
     TEST_ASSERT_EQUAL_UINT16(0u, light_core_glitch_count(g_core));
 }
 
+/* ---------- T: telemetry helper contract (spec 6). Pins the shared formatter
+ * so both sched.c (frame_ms/heartbeat/ch0_slot/...) and frame.c (glitch_count)
+ * emit identical T:key=value lines through the same helper. ---------- */
+
+static void test_telemetry_helper_format(void)
+{
+    /* 单个 u32 值 -> 一行 T:key=value，十进制、无前导零。 */
+    memset(fake.logs, 0, sizeof(fake.logs));
+    fake.log_count = 0;
+    telemetry_emit_t_u32(&g_ports, "frame_ms", 12u);
+    TEST_ASSERT_EQUAL_INT(1, fake.log_count);
+    TEST_ASSERT_EQUAL_STRING("T:frame_ms=12", fake.logs[0]);
+
+    /* 边界值：0 与最大 u32。 */
+    memset(fake.logs, 0, sizeof(fake.logs));
+    fake.log_count = 0;
+    telemetry_emit_t_u32(&g_ports, "glitch_count", 0u);
+    TEST_ASSERT_EQUAL_STRING("T:glitch_count=0", fake.logs[0]);
+    telemetry_emit_t_u32(&g_ports, "drop_count", 4294967295u);
+    TEST_ASSERT_EQUAL_STRING("T:drop_count=4294967295", fake.logs[1]);
+
+    /* 字符串值（frame.c 场景走同一条路径）。 */
+    memset(fake.logs, 0, sizeof(fake.logs));
+    fake.log_count = 0;
+    telemetry_emit_t_str(&g_ports, "key", "val");
+    TEST_ASSERT_EQUAL_STRING("T:key=val", fake.logs[0]);
+}
+
 /* ---------- main (single main for the whole host test binary) ---------- */
 
 int main(void)
@@ -874,5 +903,6 @@ int main(void)
     RUN_TEST(test_d15_time_wrap);
     RUN_TEST(test_d16_glitch_counting);
     RUN_TEST(test_telemetry_lines);
+    RUN_TEST(test_telemetry_helper_format);
     return UNITY_END();
 }
