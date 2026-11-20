@@ -19,4 +19,5 @@
 
 ## 状态
 
-骨架阶段：目录就位，代码在执行阶段落地（issue #28 之后的执行 ticket）。
+纯 C99 core（`effects/` `driver/` `proto/`）已实现；`test/` 有 30 个 Unity host 用例（D1–D16 + 灯效 + 遥测）。
+`ports/`（ESP-IDF：rmt / route / clock / log / nvs）与 `main/`（`app_main` / 任务循环 / ISR）**尚未实现**，因此 `pio run -e esp32c3` 还不能编译上板，目前只能 `pio test -e native` 跑 host 单测。落差与后续见 `docs/handover.md`。

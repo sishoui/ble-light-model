@@ -434,7 +434,7 @@ release 关闭、dev/test 打开：
 
 ## 7. host 单测清单
 
-放 `tests/driver/`，与 `firmware/driver`、`firmware/effects` 同源编译（C99，无 IDF），用假 `light_ports_t` + 假时钟驱动。测试框架选型归 #26 / #28 定，本文只定用例与断言。
+放 `firmware/test/`（PlatformIO `[env:native]` 约定），与 `firmware/driver`、`firmware/effects` 同源编译（C99，无 IDF），用假 `light_ports_t` + 假时钟驱动。测试框架选型归 #26 / #28 定，本文只定用例与断言。
 
 | # | 用例 | 断言 |
 |---|---|---|

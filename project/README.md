@@ -8,4 +8,4 @@
 
 ## 状态
 
-骨架阶段：`project.yaml` 就位、`gen-site.mjs` 输出占位站可绿；完整三页视图与新鲜度 badge 在执行阶段落地。
+未实现：`project.yaml` 就位、`gen-site.mjs` 仍输出占位站；完整三页视图与新鲜度 badge 尚未实现（见 `docs/handover.md`）。

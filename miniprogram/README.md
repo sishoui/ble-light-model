@@ -4,16 +4,16 @@
 
 ```text
 miniprogram/
-  app.ts                      # 组合根（执行阶段落地）
-  app.json / app.wxss         # 小程序全局配置（执行阶段落地）
+  app.ts                      # 组合根（未实现）
+  app.json / app.wxss         # 小程序全局配置（未实现）
   logic/                      # 逻辑层（npm workspace @ble-light/logic）
     src/index.ts              # 唯一导出入口
     tsconfig.build.json       # tsc -> dist（CJS / ES2017 / d.ts / sourcemap）
     package.json              # main: dist/index.js
     dist/                     # 唯一产物，gitignore
-  transport/                  # factory.ts / wx-transport.ts（执行阶段落地）
-  test/                       # fake-transport.ts / 页面命名场景
-  pages/device/               # index.ts / index.wxml / index.wxss / index.json
+  transport/                  # factory / wx-transport / pc-transport / fake-transport（已实现）
+  test/                       # 页面命名场景（未实现；FakeTransport 在 transport/）
+  pages/device/               # index.ts / index.wxml / index.wxss / index.json（未实现）
   project.config.json         # 小程序项目配置（AppID 见下）
 ```
 
@@ -29,4 +29,6 @@ miniprogram/
 
 ## 状态
 
-骨架阶段：`logic/` workspace 与占位 `index.ts` 就位，其余目录在执行阶段落地。
+- `logic/`：已实现 `codec` / `BleLink` / `DeviceController` / `ViewState` / `Clock` / Transport 接口（30 vitest 用例）。
+- `transport/`：`WxTransport` / `PcBleTransport` / `FakeTransport` / `factory` 已实现。
+- 未实现：`app.ts` / `app.json` / `pages/device/`（页面层）、`test/` 命名场景。见 `docs/handover.md`。

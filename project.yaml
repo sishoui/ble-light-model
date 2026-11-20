@@ -115,26 +115,26 @@ tasks:
     milestone: spec
     module: test-harness
     title: 仓库脚手架与 CI 基线
-    status: in_progress
+    status: done
     issue: 28
   - id: t7
     milestone: implement
     module: firmware/driver
     title: C 驱动 + host 单测
-    status: todo
-    issue: null
+    status: done
+    issue: 35
   - id: t8
     milestone: implement
     module: app/logic
     title: 小程序逻辑 + codec
-    status: todo
-    issue: null
+    status: done
+    issue: 34
   - id: t9
     milestone: regression
     module: test-harness
     title: 三端 golden 对拍
-    status: todo
-    issue: null
+    status: done
+    issue: 36
 
 risks:
   - id: r1
