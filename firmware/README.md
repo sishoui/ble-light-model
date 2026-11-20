@@ -9,7 +9,7 @@
 | `proto/` | 协议 codec（帧 / CRC / ACK/NAK / scene） | 纯 C99（`docs/spec/protocol.md` §12） |
 | `ports/` | 唯一出现 ESP-IDF 的地方（rmt / route / clock / log / nvs） | 不碰调度策略 |
 | `main/` | app_main：任务循环、ISR 注册、启动顺序 | — |
-| `test/` | C core host 单测（Unity，`[env:native]`） | 用例见 `docs/spec/driver.md` §6（D1–D16） |
+| `test/` | C core host 单测（Unity，`[env:native]`） | 用例见 `docs/spec/driver.md` §7（D1–D16） |
 
 ## 版本锁定
 

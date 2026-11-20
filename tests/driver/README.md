@@ -1,6 +1,6 @@
 # C core host 单测（firmware/[env:native]）
 
-层 1 C 侧。用例清单 D1–D16 见 `docs/spec/driver.md` §6。与 `firmware/driver`、`firmware/effects`、`firmware/proto` 同源编译（C99，无 IDF），用假 `light_ports_t` + 假时钟驱动。
+层 1 C 侧。用例清单 D1–D16 见 `docs/spec/driver.md` §7。与 `firmware/driver`、`firmware/effects`、`firmware/proto` 同源编译（C99，无 IDF），用假 `light_ports_t` + 假时钟驱动。
 
 ## 运行
 
