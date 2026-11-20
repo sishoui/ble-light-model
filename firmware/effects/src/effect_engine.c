@@ -13,6 +13,8 @@
 //     = round((0.5-0.5*cos(2πp))*255)，即 0..255 的明度因子。
 //   - 星闪 hash32 严格照 effects.md §6.8（uint32 环绕乘法）。
 
+#include <stddef.h>
+
 #include "effect_engine.h"
 
 /* ---------- 小工具 ---------- */
